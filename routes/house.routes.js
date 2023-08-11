@@ -16,10 +16,9 @@ router.get("/", async(req, res)=>{
 
 // Get a specific House
 router.get("/:houseId", async(req, res)=>{
+    const {houseId} = req.params;
     try{
-        const {houseId} = req.params;
         const house = await House.findById(houseId).populate("postedBy")
-
         res.status(200).json(house)
     }catch(error){
         console.log(error.message);
@@ -30,8 +29,8 @@ router.get("/:houseId", async(req, res)=>{
 // Creating a new house
 router.post("/new", async(req, res) => {
 
+    const body = {...req.body}
     try{
-        const body = {...req.body}
         const newHouse = await House.create(body)
         const findHouse = await House.findById(newHouse._id).populate("postedBy")
         res.status(201).json(findHouse)
@@ -43,9 +42,9 @@ router.post("/new", async(req, res) => {
 
 // Updating existing house
 router.put("/:houseId/update", async (req, res) => {
+    const body = {...req.body}
+    const {houseId} = req.params
     try{
-        const body = {...req.body}
-        const {houseId} = req.params
         const updateHouse = await House.findByIdAndUpdate(houseId, body, {new:true})
         
         res.status(201).json(updateHouse)
@@ -56,8 +55,8 @@ router.put("/:houseId/update", async (req, res) => {
 })
 
 router.delete("/:houseId/delete/", async(req, res) => {
+    const {houseId} = req.params
     try{
-        const {houseId} = req.params
         const deleteHouse = await House.findByIdAndDelete(houseId)
         res.status(204).json({message:"House deleted",deleteHouse})
     }catch(error){
