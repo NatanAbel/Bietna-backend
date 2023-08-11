@@ -90,7 +90,7 @@ router.put("/profile", isAuthenticated, async (req, res) => {
     const body = req.body;
     const username = req.payload.data.user.username 
     try{
-        const userUpdated = await User.findOneAndUpdate({username},body,{new:true}).populate("published")
+        const userUpdated = await User.findOneAndUpdate({username:username},body,{new:true}).populate("published")
         res.status(200).json(userUpdated)  
     }catch(err){
         console.log(err.message);
@@ -100,8 +100,10 @@ router.put("/profile", isAuthenticated, async (req, res) => {
 router.delete("/delete", isAuthenticated, async(req,res)=>{
     const username = req.payload.data.user.username;
     try{
-        await User.findOneAndDelete({username});
-        res.status(200).json({message:"User deleted"})
+        if(username){
+            await User.findOneAndDelete({username});
+            res.status(200).json({message:"User deleted"})
+        }
     }catch(err){
         console.log(err.message);
     }
