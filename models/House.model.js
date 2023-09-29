@@ -37,6 +37,10 @@ const houseSchema = new Schema({
     type: Number,
     default: 0,
   },
+  availability: {
+    forSale: Boolean,
+    forRent: Boolean,
+  },
 });
 
 const House = model("House", houseSchema);
