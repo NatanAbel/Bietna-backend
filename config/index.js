@@ -28,6 +28,8 @@ module.exports = (app) => {
     })
   );
 
+  app.use(express.static('public'))
+
   // In development environment the app logs
   app.use(logger("dev"));
 
