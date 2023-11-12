@@ -26,7 +26,10 @@ const houseSchema = new Schema({
 
   features: [String],
 
-  images: [String],
+  images:{ 
+    type:[String],
+    required: [true, "Images are required"],
+  },
 
   postedBy:{
     type: Schema.Types.ObjectId,

@@ -42,7 +42,7 @@ router.get("/:houseId", async (req, res) => {
 });
 
 // Creating a new house
-router.post("/new", upload.array("image", 5), async (req, res) => {
+router.post("/new", upload.array("image", 10), async (req, res) => {
   try {
     const body = { ...req.body };
     body.availability = JSON.parse(body.availability);
@@ -50,10 +50,10 @@ router.post("/new", upload.array("image", 5), async (req, res) => {
     const images = req.files.map((file) => file.filename);
     //Append the images to the request body
     body.images = images;
-    console.log("imagessss.......",body.images);
-    const newHouse = await House.create(body);
-    const findHouse = await House.findById(newHouse._id).populate("postedBy");
-    res.status(201).json(findHouse);
+
+      const newHouse = await House.create(body);
+      const findHouse = await House.findById(newHouse._id).populate("postedBy");
+      res.status(201).json(findHouse);    
   } catch (error) {
     console.log(error.message);
     res.status(500).json({ message: "Error creating a new house" });
@@ -61,9 +61,8 @@ router.post("/new", upload.array("image", 5), async (req, res) => {
 });
 
 // Updating existing house
-router.put("/:houseId/update", upload.array("image", 5), async (req, res) => {
+router.put("/:houseId/update", upload.array("image", 10), async (req, res) => {
   try {
-    // const body = {...req.body}
     const body = { ...req.body };
     body.availability = JSON.parse(body.availability);
     const { houseId } = req.params;
@@ -79,7 +78,7 @@ router.put("/:houseId/update", upload.array("image", 5), async (req, res) => {
       new: true,
     });
 
-    res.status(201).json(updateHouse);
+    res.status(200).json(updateHouse);
   } catch (error) {
     console.log(error.message);
   }
