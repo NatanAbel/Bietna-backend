@@ -46,14 +46,36 @@ router.post("/new", upload.array("image", 10), async (req, res) => {
   try {
     const body = { ...req.body };
     body.availability = JSON.parse(body.availability);
+
     // Extract the uploaded images from req.files
     const images = req.files.map((file) => file.filename);
+    // Validate the array of images ==> min 2 photos
+    if (images.length < 2) {
+      return res.status(400).json({ message: "At least two images are required." });
+    }
     //Append the images to the request body
     body.images = images;
 
-      const newHouse = await House.create(body);
-      const findHouse = await House.findById(newHouse._id).populate("postedBy");
-      res.status(201).json(findHouse);    
+    const requiredFields = ["address","bedrooms","bathrooms","sqm","description","availability","images"];
+    const numericFields = ["price","bedrooms","bathrooms","sqm","rentalPrice"];
+
+    for (const field of requiredFields) { 
+      if (!body[field]) {
+        return res.status(400).json({ message: `${field} is required.` });
+      }
+    }
+
+    for (const field of numericFields) {
+      if (isNaN(body[field])) {
+        return res
+          .status(400)
+          .json({ message: `${field} must be a valid number.` });
+      }
+    }
+
+    const newHouse = await House.create(body);
+    const findHouse = await House.findById(newHouse._id).populate("postedBy");
+    res.status(201).json(findHouse);
   } catch (error) {
     console.log(error.message);
     res.status(500).json({ message: "Error creating a new house" });
@@ -66,7 +88,7 @@ router.put("/:houseId/update", upload.array("image", 10), async (req, res) => {
     const body = { ...req.body };
     body.availability = JSON.parse(body.availability);
     const { houseId } = req.params;
-    
+
     const house = await House.findById(houseId);
 
     // Extract the uploaded images from req.files
