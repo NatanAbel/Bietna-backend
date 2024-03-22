@@ -26,7 +26,7 @@ const houseSchema = new Schema(
     },
 
     features: [String],
-
+    
     images: {
       type: [String],
       required: [true, "Images are required"],
