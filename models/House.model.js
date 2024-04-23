@@ -24,19 +24,25 @@ const houseSchema = new Schema(
       type: Number,
       default: 0,
     },
-
-    features: [String],
-    
+    city: {
+      type: String
+    },
+    homeType:{
+      type: String,
+      enum: ["apartment", "store","office","land","condo","house","warehouse"]
+    },
+    features: {
+      type:[String],
+      enum:["swimming pool", "garage","outdoor space", "tense","fireplace","central heating/cooling","furnished","renovated", "elevator"]
+    },
     images: {
       type: [String],
       required: [true, "Images are required"],
     },
-
     postedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
     },
-
     rentalPrice: {
       type: Number,
       default: 0,
@@ -45,6 +51,10 @@ const houseSchema = new Schema(
       forSale: Boolean,
       forRent: Boolean,
     },
+    yearBuilt:{
+      type: Number,
+      default: 0,
+    }
   },
   {
     // this second object adds extra properties: `createdAt` and `updatedAt`

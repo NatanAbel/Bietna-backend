@@ -4,6 +4,7 @@ const router = express.Router();
 const House = require("../models/House.model");
 const User = require("../models/User.model");
 const path = require("path");
+// const sharp = require('sharp'); //Sharp is a high-performance Node.js image processing library that supports image compression and resizing.
 
 // Configure the storage for file uploads
 const storage = multer.diskStorage({
@@ -45,21 +46,50 @@ router.get("/:houseId", async (req, res) => {
 router.post("/new", upload.array("image", 10), async (req, res) => {
   try {
     const body = { ...req.body };
+    // console.log("body......", body);
+    // parsing avelability from string to object
     body.availability = JSON.parse(body.availability);
-
+    body.features = JSON.parse(body.features);
     // Extract the uploaded images from req.files
     const images = req.files.map((file) => file.filename);
+    // Extract the uploaded images from req.files
+    // const images = await Promise.all(req.files.map(async (file) => {
+    //   const compressedImageBuffer = await sharp(file.path)
+    //     .resize(800) // Resize the image to a maximum width of 800 pixels
+    //     .jpeg({ quality: 80 }) // Set JPEG quality to 80% to reduce the file size while maintaining reasonable image quality.
+    //     .toBuffer(); //convert the processed image back to a buffer.
+    //   return {
+    //     buffer: compressedImageBuffer,
+    //     filename: file.filename // Use original filename
+    //   };
+    // }));
     // Validate the array of images ==> min 2 photos
-    if (images.length < 2) {
-      return res.status(400).json({ message: "At least two images are required." });
+    if (images.length < 3) {
+      return res
+        .status(400)
+        .json({ message: "At least two images are required." });
     }
     //Append the images to the request body
     body.images = images;
 
-    const requiredFields = ["address","bedrooms","bathrooms","sqm","description","availability","images"];
-    const numericFields = ["price","bedrooms","bathrooms","sqm","rentalPrice"];
+    const requiredFields = [
+      "address",
+      "bedrooms",
+      "bathrooms",
+      "sqm",
+      "description",
+      "availability",
+      "images",
+    ];
+    const numericFields = [
+      "price",
+      "bedrooms",
+      "bathrooms",
+      "sqm",
+      "rentalPrice",
+    ];
 
-    for (const field of requiredFields) { 
+    for (const field of requiredFields) {
       if (!body[field]) {
         return res.status(400).json({ message: `${field} is required.` });
       }
@@ -74,6 +104,7 @@ router.post("/new", upload.array("image", 10), async (req, res) => {
     }
 
     const newHouse = await House.create(body);
+    console.log("newHouse....",newHouse);
     const findHouse = await House.findById(newHouse._id).populate("postedBy");
     res.status(201).json(findHouse);
   } catch (error) {
@@ -87,12 +118,26 @@ router.put("/:houseId/update", upload.array("image", 10), async (req, res) => {
   try {
     const body = { ...req.body };
     body.availability = JSON.parse(body.availability);
+    body.features = JSON.parse(body.features);
     const { houseId } = req.params;
 
     const house = await House.findById(houseId);
 
     // Extract the uploaded images from req.files
     const newImages = req.files.map((file) => file.filename);
+
+    // Extract the uploaded images from req.files
+    // const newImages = await Promise.all(req.files.map(async (file) => {
+    //   const compressedImageBuffer = await sharp(file.path)
+    //     .resize(800) // Resize the image to a maximum width of 800 pixels
+    //     .jpeg({ quality: 80 }) // Set JPEG quality to 80%
+    //     .toBuffer(); // Convert the image to a buffer
+    //   return {
+    //     buffer: compressedImageBuffer,
+    //     filename: file.filename // Use original filename
+    //   };
+    // }));
+
     // Append the new images to the existing images
     body.images = [...house.images, ...newImages];
 
@@ -106,7 +151,31 @@ router.put("/:houseId/update", upload.array("image", 10), async (req, res) => {
   }
 });
 
-router.delete("/:houseId/delete/", async (req, res) => {
+// Backend routes for fetching enum values
+router.get("/homeTypes/enumValues", async (req, res) => {
+  try {
+    const enumValues = House.schema.path("homeType").options.enum;
+    res.status(200).json(enumValues);
+  } catch (error) {
+    console.log(error.message);
+    res
+      .status(500)
+      .json({ message: "Error fetching enum values for homeType" });
+  }
+});
+
+router.get("/enumValues/features", async (req, res) => {
+  try {
+    const enumValues = House.schema.path("features").options.enum;
+    res.status(200).json(enumValues);
+  } catch (error) {
+    console.log(error.message);
+    res
+      .status(500)
+      .json({ message: "Error fetching enum values for features" });
+  }
+});
+router.delete("/:houseId/delete", async (req, res) => {
   const { houseId } = req.params;
   try {
     const deleteHouse = await House.findByIdAndDelete(houseId);
