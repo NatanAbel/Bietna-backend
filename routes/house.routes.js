@@ -31,6 +31,39 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/paginatedHouse", async (req, res) => {
+  try {
+    const page = parseInt(req.query.page);
+    const limit = parseInt(req.query.limit);
+    
+    const startIndex = (page - 1) * limit;
+    const endIndex = page * limit;
+
+    const houses = await House.find({});
+    const results = {};
+    results.totalHouses = houses.length;
+    results.pageCount = Math.ceil(houses.length / limit);
+    //Condition to check if there is exrta page to display.
+    if (endIndex < houses.length) {
+      results.next = {
+        page: page + 1,
+      };
+    }
+    // Codition to make sure page number starts from 1.
+    if (startIndex > 0) {
+      results.perivous = {
+        page: page - 1,
+      };
+    }
+    // Results for one page
+    results.result = houses.splice(startIndex, endIndex);
+    // console.log(results)
+    res.status(200).json(results);
+  } catch (error) {
+    console.log(error.message);
+  }
+});
+
 // Get a specific House
 router.get("/:houseId", async (req, res) => {
   const { houseId } = req.params;
@@ -104,7 +137,6 @@ router.post("/new", upload.array("image", 10), async (req, res) => {
     }
 
     const newHouse = await House.create(body);
-    console.log("newHouse....",newHouse);
     const findHouse = await House.findById(newHouse._id).populate("postedBy");
     res.status(201).json(findHouse);
   } catch (error) {
