@@ -13,16 +13,33 @@ const userSchema = new Schema(
     email: {
       type: String,
       required:[true, 'email is required.'],
+      lowercase: true,
       unique: true
     },
     password: {
       type: String,
       required: [true, 'Password is required.']
     },
+    firstName: {
+      type: String,
+      lowercase: true,
+      default: '',
+      // required: [true, 'firstName is required.']
+    },
+    lastName:{
+      type: String,
+      lowercase: true,
+      default: '',
+      // required: [true, 'lastName is required.']
+    },
     role : {
       type: String,
       enum: ['user', 'admin'],
       default: 'user'
+    },
+    bio: {
+      type: String,
+      default: '',
     },
     published : {
       type: [Schema.Types.ObjectId],
@@ -42,6 +59,7 @@ const userSchema = new Schema(
     },
     phoneNumber: {
       type: Number,
+      default: 0,
     },
     
   },

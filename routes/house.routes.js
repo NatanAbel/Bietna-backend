@@ -4,6 +4,7 @@ const router = express.Router();
 const House = require("../models/House.model");
 const User = require("../models/User.model");
 const path = require("path");
+const { isAuthenticated } = require("../middleware/jwt.middleware");
 // const sharp = require('sharp'); //Sharp is a high-performance Node.js image processing library that supports image compression and resizing.
 
 // Configure the storage for file uploads
@@ -76,7 +77,7 @@ router.get("/:houseId", async (req, res) => {
 });
 
 // Creating a new house
-router.post("/new", upload.array("image", 10), async (req, res) => {
+router.post("/new",isAuthenticated ,upload.array("image", 10), async (req, res) => {
   try {
     const body = { ...req.body };
     // console.log("body......", body);
@@ -146,7 +147,7 @@ router.post("/new", upload.array("image", 10), async (req, res) => {
 });
 
 // Updating existing house
-router.put("/:houseId/update", upload.array("image", 10), async (req, res) => {
+router.put("/:houseId/update",isAuthenticated, upload.array("image", 10), async (req, res) => {
   try {
     const body = { ...req.body };
     body.availability = JSON.parse(body.availability);
@@ -207,7 +208,7 @@ router.get("/enumValues/features", async (req, res) => {
       .json({ message: "Error fetching enum values for features" });
   }
 });
-router.delete("/:houseId/delete", async (req, res) => {
+router.delete("/:houseId/delete",isAuthenticated ,async (req, res) => {
   const { houseId } = req.params;
   try {
     const deleteHouse = await House.findByIdAndDelete(houseId);

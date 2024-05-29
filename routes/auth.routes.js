@@ -14,7 +14,7 @@ router.post("/signup", async (req, res) => {
     if (sameUserAndEmail.length > 0) {
       res
         .status(409)
-        .json({ message: "User name already exists", sameUserAndEmail });
+        .json({ message: "Username or email already exists", sameUserAndEmail });
     } else {
       const salt = bcrypt.genSaltSync(13);
       const encryptedPassword = bcrypt.hashSync(body.password, salt);
@@ -48,7 +48,7 @@ router.post("/login", async (req, res) => {
         const token = jwt.sign(
           {
             exp: Math.floor(Date.now() / 1000) + 60 * 60,
-            data: { user: { userName: currentUser.userName } },
+            data: { user: { userId: currentUser._id } },
           },
           process.env.TOKEN_SECRET
         );
@@ -75,7 +75,7 @@ router.post("/google", async (req, res, next) => {
         const token = jwt.sign(
           {
             exp: Math.floor(Date.now() / 1000) + 60 * 60,
-            data: { user: { userName: user.userName } },
+            data: { user: { userId: user._id } },
           },
           process.env.TOKEN_SECRET
         );
@@ -98,7 +98,7 @@ router.post("/google", async (req, res, next) => {
       const token = jwt.sign(
         {
           exp: Math.floor(Date.now() / 1000) + 60 * 60,
-          data: { user: { userName: user.userName } },
+          data: { user: { userId: user._id } },
         },
         process.env.TOKEN_SECRET
       );
@@ -113,10 +113,11 @@ router.post("/google", async (req, res, next) => {
 
 router.get("/verify", isAuthenticated, async (req, res) => {
   try {
+    
     if (req.payload) {
-      const userName = req.payload.data.user.userName;
-      const verifyUser = await User.findOne({ userName });
-      // console.log("req...",verifyUser);
+      const userId = req.payload.data.user.userId;
+      const verifyUser = await User.findById(userId);
+
       res.status(200).json({ verifyUser });
     }
   } catch (err) {
@@ -125,23 +126,38 @@ router.get("/verify", isAuthenticated, async (req, res) => {
 });
 
 router.get("/profile", isAuthenticated, async (req, res) => {
-  const userName = req.payload.data.user.userName;
+  const userId = req.payload.data.user.userId;
   try {
-    const userFound = await User.findOne({ userName }).populate("published");
+    const userFound = await User.findById(userId ).populate("published").populate("favorites").populate("savedSearches");
     let published = userFound.published;
-    const publishedArr = [];
-    const houses = await Promise.all(
-      published.map(async (house) => {
-        const publishedHouse = await House.findById(house._id).populate(
-          "postedBy"
-        );
-        publishedArr.push(publishedHouse);
-      })
-    );
+    let favorites = userFound.favorites;
+    let savedSearches = userFound.savedSearches;
 
+    const publishedArr = [];
+    const favoritesArr = [];
+    const savedSearchesArr = [];
+
+    if(published.length > 0||favorites.length>0||savedSearches.length>0) {
+
+    const houses = await Promise.all(published.map(async (house) => {
+        const publishedHouse = await House.findById(house._id).populate("postedBy");
+        
+        publishedArr.push(publishedHouse);
+    }));
+    const userFavorites = await Promise.all(favorites.map(async (house) => {
+        const favoriteHouses = await House.findById(house._id).populate("postedBy");
+        
+        favoritesArr.push(favoriteHouses);
+      }));
+    const userSavedSearch = await Promise.all(savedSearches.map(async (house) => {
+        const searchedHouses = await House.findById(house._id).populate("postedBy");
+        
+        savedSearchesArr.push(searchedHouses);
+      }));
+    }
     const { ...user } = userFound._doc;
     user.published = publishedArr;
-    console.log("userFound....", user);
+
 
     res.status(200).json({ user });
   } catch (err) {
@@ -151,13 +167,17 @@ router.get("/profile", isAuthenticated, async (req, res) => {
 
 router.put("/profile", isAuthenticated, async (req, res) => {
   const body = req.body;
-  const userName = req.payload.data.user.userName;
+  const userId = req.payload.data.user.userId;
+  console.log("req...",req.payload.data.user);
   try {
-    const userUpdated = await User.findOneAndUpdate(
-      { userName: userName },
+
+    const userFound = await User.findById(userId)
+
+    const userUpdated = await User.findByIdAndUpdate(
+      userFound._id,
       body,
       { new: true }
-    ).populate("published");
+    ).populate("published").populate("favorites").populate("savedSearches");
     res.status(200).json(userUpdated);
   } catch (err) {
     console.log(err.message);
