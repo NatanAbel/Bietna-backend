@@ -36,7 +36,6 @@ router.post("/login", async (req, res) => {
   try {
     //find if the user exists
     const user = await User.find({ userName: body.userName });
-    console.log("user.....", user)
     if (user.length > 0) {
       const currentUser = user[0];
       // console.log("currentUser.....",currentUser)
@@ -157,6 +156,8 @@ router.get("/profile", isAuthenticated, async (req, res) => {
     }
     const { ...user } = userFound._doc;
     user.published = publishedArr;
+    user.favorites = favoritesArr;
+    user.savedSearches = savedSearchesArr;
 
 
     res.status(200).json({ user });
@@ -165,22 +166,93 @@ router.get("/profile", isAuthenticated, async (req, res) => {
   }
 });
 
+// router.put("/profile", isAuthenticated, async (req, res) => {
+//   const body = req.body;
+//   const userId = req.payload.data.user.userId;
+//   try {
+//     const userFound = await User.findById(userId)
+
+//     console.log("User found:", userFound);
+//             console.log("Favorites before update:", userFound.favorites);
+//             console.log("Body favourites:", body.favourites);
+
+//     if (!userFound) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+//      // Add house to favorites if not already there
+//     //  if (!userFound.favorites.includes(body.favourites)) {
+//     //   userFound.favorites.push(body.favourites);
+//     // }
+
+//     const newFav = userFound.favorites.includes(body.favourites) ?
+//             // if it's already favorited remove it 
+//             userFound.favorites.filter(fav => fav !== body.favourites) : 
+//             // if it's not add to favorites
+//             [...userFound.favorites, body.favourites];
+             
+//             userFound.favorites = newFav
+
+            
+//     const userUpdated = await User.findByIdAndUpdate(
+//       userFound._id,
+//       {favorites: userFound.favorites},
+//       { new: true }
+//     ).populate("published").populate("favorites").populate("savedSearches");
+//     // console.log("userUpdated....", userUpdated);
+//     res.status(200).json(userUpdated);
+//   } catch (err) {
+//     console.log(err.message);
+//   }
+// });
+
 router.put("/profile", isAuthenticated, async (req, res) => {
-  const body = req.body;
+  const { body } = req;
   const userId = req.payload.data.user.userId;
-  console.log("req...",req.payload.data.user);
+
   try {
+    const userFound = await User.findById(userId);
 
-    const userFound = await User.findById(userId)
+    if (!userFound) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
-    const userUpdated = await User.findByIdAndUpdate(
-      userFound._id,
-      body,
-      { new: true }
-    ).populate("published").populate("favorites").populate("savedSearches");
+    // Create update object to update the entire body and manage favorites
+    const updateData = { ...body };
+
+    // Determine if the favourite is already in the user's list
+    const isFavourite = userFound.favorites.includes(body.favourites);
+
+    if (isFavourite) {
+      // If it's already favorited, remove it
+      await User.updateOne(
+        { _id: userId },
+        { 
+          ...updateData, 
+          $pull: { favorites: body.favourites }
+        }
+      );
+    } else {
+      // If it's not favorited, add it
+      await User.updateOne(
+        { _id: userId },
+        { 
+          ...updateData, 
+          $addToSet: { favorites: body.favourites }
+        }
+      );
+    }
+
+    // Refetch the updated user data
+    const userUpdated = await User.findById(userId)
+      .populate("published")
+      .populate("favorites")
+      .populate("savedSearches");
+
+    console.log("User updated:", userUpdated);
     res.status(200).json(userUpdated);
   } catch (err) {
     console.log(err.message);
+    res.status(500).json({ message: "Internal server error" });
   }
 });
 

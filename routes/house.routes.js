@@ -77,10 +77,12 @@ router.get("/:houseId", async (req, res) => {
 });
 
 // Creating a new house
-router.post("/new",isAuthenticated ,upload.array("image", 10), async (req, res) => {
+router.post("/new",isAuthenticated,upload.array("image", 10), async (req, res) => {
+  console.log("userId......", req.payload);
   try {
+    const userId = req.payload.data.user.userId;
+      // const verifyUser = await User.findById(userId);
     const body = { ...req.body };
-    // console.log("body......", body);
     // parsing avelability from string to object
     body.availability = JSON.parse(body.availability);
     body.features = JSON.parse(body.features);
@@ -138,11 +140,12 @@ router.post("/new",isAuthenticated ,upload.array("image", 10), async (req, res) 
     }
 
     const newHouse = await House.create(body);
+    const user = await User.findByIdAndUpdate(userId, {$push: {published: newHouse._id}});
     const findHouse = await House.findById(newHouse._id).populate("postedBy");
     res.status(201).json(findHouse);
   } catch (error) {
     console.log(error.message);
-    res.status(500).json({ message: "Error creating a new house" });
+    res.status(500).json({message: "Error creating a new house"});
   }
 });
 
