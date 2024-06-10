@@ -69,7 +69,6 @@ router.post("/google", async (req, res, next) => {
   try {
     //find if the user exists
     const user = await User.findOne({ email: body.email });
-    console.log("user.....", user)
     if (user) {
         const token = jwt.sign(
           {
@@ -159,51 +158,11 @@ router.get("/profile", isAuthenticated, async (req, res) => {
     user.favorites = favoritesArr;
     user.savedSearches = savedSearchesArr;
 
-
     res.status(200).json({ user });
   } catch (err) {
     console.log(err.message);
   }
 });
-
-// router.put("/profile", isAuthenticated, async (req, res) => {
-//   const body = req.body;
-//   const userId = req.payload.data.user.userId;
-//   try {
-//     const userFound = await User.findById(userId)
-
-//     console.log("User found:", userFound);
-//             console.log("Favorites before update:", userFound.favorites);
-//             console.log("Body favourites:", body.favourites);
-
-//     if (!userFound) {
-//       return res.status(404).json({ message: "User not found" });
-//     }
-//      // Add house to favorites if not already there
-//     //  if (!userFound.favorites.includes(body.favourites)) {
-//     //   userFound.favorites.push(body.favourites);
-//     // }
-
-//     const newFav = userFound.favorites.includes(body.favourites) ?
-//             // if it's already favorited remove it 
-//             userFound.favorites.filter(fav => fav !== body.favourites) : 
-//             // if it's not add to favorites
-//             [...userFound.favorites, body.favourites];
-             
-//             userFound.favorites = newFav
-
-            
-//     const userUpdated = await User.findByIdAndUpdate(
-//       userFound._id,
-//       {favorites: userFound.favorites},
-//       { new: true }
-//     ).populate("published").populate("favorites").populate("savedSearches");
-//     // console.log("userUpdated....", userUpdated);
-//     res.status(200).json(userUpdated);
-//   } catch (err) {
-//     console.log(err.message);
-//   }
-// });
 
 router.put("/profile", isAuthenticated, async (req, res) => {
   const { body } = req;
@@ -247,8 +206,6 @@ router.put("/profile", isAuthenticated, async (req, res) => {
       .populate("published")
       .populate("favorites")
       .populate("savedSearches");
-
-    console.log("User updated:", userUpdated);
     res.status(200).json(userUpdated);
   } catch (err) {
     console.log(err.message);
@@ -257,11 +214,17 @@ router.put("/profile", isAuthenticated, async (req, res) => {
 });
 
 router.delete("/delete", isAuthenticated, async (req, res) => {
-  const userName = req.payload.data.user.userName;
+  const userId = req.payload.data.user.userId;
   try {
-    if (userName) {
-      await User.findOneAndDelete({ userName });
-      res.status(200).json({ message: "User deleted" });
+    if (userId) {
+      // const userFound = await User.findById(userId).populate("published")
+      // .populate("favorites")
+      // .populate("savedSearches");
+      // console.log(userFound);
+
+      await User.findByIdAndDelete(userId)
+      
+      res.status(200).json({ message:"User deleted"});
     }
   } catch (err) {
     console.log(err.message);
