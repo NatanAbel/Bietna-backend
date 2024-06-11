@@ -271,7 +271,7 @@ router.delete("/:houseId/delete", isAuthenticated, async (req, res) => {
     });
 
     const user = await User.findByIdAndUpdate(userId, {
-        $pull: { published: houseId },
+        $pull: { published: houseId,favorites:houseId},
       });
 
     const deleteHouse = await House.findByIdAndDelete(houseId);

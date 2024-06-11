@@ -217,14 +217,33 @@ router.delete("/delete", isAuthenticated, async (req, res) => {
   const userId = req.payload.data.user.userId;
   try {
     if (userId) {
-      // const userFound = await User.findById(userId).populate("published")
-      // .populate("favorites")
-      // .populate("savedSearches");
-      // console.log(userFound);
+      const userFound = await User.findById(userId).populate("published")
+      .populate("favorites")
+      .populate("savedSearches");
+
+      if (!userFound) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      // Extract IDs of posted houses and favorite houses
+      const postedHouseIds = userFound.published.map((house) => house._id);
+      const favoriteHouseIds = userFound.favorites.map((house) => house._id);
+
+      // Delete all the user's posted houses
+      await House.deleteMany({ _id: { $in: postedHouseIds } });
+
+      // Optionally, remove the user from any favorites list of other users
+      await User.updateMany(
+        { favorites: { $in: favoriteHouseIds } },
+        { $pull: { favorites: { $in: favoriteHouseIds } } }
+      );
+
 
       await User.findByIdAndDelete(userId)
       
-      res.status(200).json({ message:"User deleted"});
+      res.status(200).json({ message:"User and associated data deleted"});
+    }else{
+      res.status(400).json({ message: "User ID not provided" });
     }
   } catch (err) {
     console.log(err.message);
