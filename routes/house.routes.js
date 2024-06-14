@@ -251,7 +251,7 @@ router.delete("/:houseId/delete", isAuthenticated, async (req, res) => {
   try {
 
     // Find the house to get the image filenames
-    const house = await House.findById(houseId);
+    const house = await House.findById(houseId).populate("postedBy");
 
     if (!house) {
       return res.status(404).json({ message: "House not found" });
@@ -260,22 +260,38 @@ router.delete("/:houseId/delete", isAuthenticated, async (req, res) => {
     // Delete the image files from the filesystem
     const imageFiles = house.images;
     const imagePath = path.join(__dirname, '..', 'public', 'images');
-    console.log("imagePath.....",imagePath)
-    imageFiles.forEach((filename) => {
-      const filePath = path.join(imagePath, filename);
-      fs.unlink(filePath, (err) => {
-        if (err) {
-          console.error(`Failed to delete file ${filename}:`, err);
-        }
-      });
-    });
+    console.log("imagePath.....", imagePath);
 
+    for (const filename of imageFiles) {
+      const filePath = path.join(imagePath, filename);
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`Successfully deleted file ${filename}`);
+        } else {
+          console.warn(`File ${filename} does not exist at path ${filePath}`);
+        }
+      } catch (err) {
+        console.error(`Failed to delete file ${filename}:`, err);
+      }
+    }
+
+    
+     // Remove the houseId from the published and favorites arrays of the user who posted the house
     const user = await User.findByIdAndUpdate(userId, {
         $pull: { published: houseId,favorites:houseId},
       });
 
+     // Remove the houseId from the favorites arrays of all users who have it
+     await User.updateMany(
+      { favorites: houseId },
+      { $pull: { favorites: houseId } }
+    );
+
     const deleteHouse = await House.findByIdAndDelete(houseId);
-    res.status(204).json({ message: "House deleted", deleteHouse });
+
+    res.status(204).json({ message: "House deleted",deleteHouse });
+
   } catch (error) {
     console.log(error.message);
   }

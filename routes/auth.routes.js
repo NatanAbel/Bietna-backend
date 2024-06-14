@@ -230,14 +230,20 @@ router.delete("/delete", isAuthenticated, async (req, res) => {
       const favoriteHouseIds = userFound.favorites.map((house) => house._id);
 
       // Delete all the user's posted houses
+      
       await House.deleteMany({ _id: { $in: postedHouseIds } });
 
-      // Optionally, remove the user from any favorites list of other users
+        // Remove the favorite houses of the user from other users' favorites lists
       await User.updateMany(
         { favorites: { $in: favoriteHouseIds } },
         { $pull: { favorites: { $in: favoriteHouseIds } } }
       );
 
+      // Remove the user's posted houses from other users' favorites lists
+      await User.updateMany(
+        { favorites: { $in: postedHouseIds } },
+        { $pull: { favorites: { $in: postedHouseIds } } }
+      );
 
       await User.findByIdAndDelete(userId)
       
