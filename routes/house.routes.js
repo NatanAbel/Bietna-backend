@@ -26,31 +26,32 @@ const upload = multer({ storage: storage }); // Create an instance of multer
 // get all Houses
 router.get("/", async (req, res) => {
   try {
-    const houses = await House.find().populate("postedBy");
-    res.status(200).json(houses);
-  } catch (error) {
-    console.log(error.message);
-  }
-});
-
-router.get("/paginatedHouse", async (req, res) => {
-  try {
+    // const houses = await House.find().populate("postedBy");
+    // res.status(200).json(houses);
     const page = parseInt(req.query.page);
     const limit = parseInt(req.query.limit);
 
     const startIndex = (page - 1) * limit;
-    const endIndex = page * limit;
-
-    const houses = await House.find({});
+    
+    const houses = await House.find({}).skip(startIndex)
+    .limit(limit);
     const results = {};
-    results.totalHouses = houses.length;
-    results.pageCount = Math.ceil(houses.length / limit);
+    const housesForRent = houses.filter(house => house.availability.forRent)
+    // console.log("housesForRent....",housesForRent)
+    const housesForSale = houses.filter(house => house.availability.forSale)
+    const totalHouses = await House.countDocuments();
+    
+    results.totalHouses =  totalHouses
+    results.pageCount = Math.ceil(totalHouses/ limit);
     //Condition to check if there is exrta page to display.
-    if (endIndex < houses.length) {
+
+     // Check if there is an extra page to display.
+     if (startIndex + houses.length < totalHouses) {
       results.next = {
-        page: page + 1,
+        page: page + 1
       };
     }
+
     // Codition to make sure page number starts from 1.
     if (startIndex > 0) {
       results.perivous = {
@@ -58,13 +59,14 @@ router.get("/paginatedHouse", async (req, res) => {
       };
     }
     // Results for one page
-    results.result = houses.splice(startIndex, endIndex);
+    results.result = houses
     // console.log(results)
     res.status(200).json(results);
   } catch (error) {
     console.log(error.message);
   }
 });
+
 
 // Get a specific House
 router.get("/:houseId", async (req, res) => {
@@ -217,6 +219,122 @@ router.put(
     }
   }
 );
+
+router.get("/search/result", async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 3;
+    const startIndex = (page - 1) * limit;
+    const {search, forRent, forSale, minPrice, maxPrice, beds, bath, area, city, houseType, features, squareAreaMin, squareAreaMax} = req.query
+    
+   
+
+    let query = {};
+    // Apply filters if provided
+    if (forRent === "true") {
+      query['availability.forRent'] = forRent === 'true';
+    }
+    if (forSale === "true") {
+      query['availability.forSale'] = forSale === 'true';
+    }
+
+    let priceFilters = [];
+    if (parseInt(minPrice) > 0 && !isNaN(parseInt(minPrice))) {
+      priceFilters.push(
+        { rentalPrice: { $gte: parseInt(minPrice) } },
+        { price: { $gte: parseInt(minPrice) } }
+      );
+    }
+    if (parseInt(maxPrice) > 0 && !isNaN(parseInt(maxPrice))) {
+      priceFilters.push(
+        { rentalPrice: { $lte: parseInt(maxPrice) } },
+        { price: { $lte: parseInt(maxPrice) } }
+      );
+    }
+
+    if (priceFilters.length > 0) {
+      query.$or = priceFilters;
+    }
+
+    if (parseInt(beds) >1 && !isNaN(parseInt(beds))) {
+      query.bedrooms = { $gte: parseInt(beds) };
+   }
+   if (parseInt(bath) > 1 && !isNaN(parseInt(bath))) {
+      query.bathrooms = { $gte: parseInt(bath) };
+   }
+
+   if (parseInt(squareAreaMin) >0  && !isNaN(parseInt(squareAreaMin))) {
+    query.sqm = { $gte: parseInt(squareAreaMin) };
+  }
+
+  if (parseInt(squareAreaMax) > 0 && !isNaN(parseInt(squareAreaMax))) {
+    query.sqm = query.sqm || {};
+    query.sqm.$lte = parseInt(squareAreaMax);
+  }
+
+    if (search) {
+      query.address = { $regex: new RegExp(search, 'i') };
+    }
+
+    if (area) {
+      query.address = { $regex: new RegExp(area, 'i') };
+    }
+    if (city) {
+      query.city = { $regex: new RegExp(city, 'i') };
+    }
+
+    if (houseType) {
+      query.homeType = { $in: houseType.split(',') };
+    }
+
+    if (features) {
+      query.features = { $all: features.split(',') };
+    }
+    
+    const totalHouses = await House.countDocuments(query);
+    console.log("totalHouses......",totalHouses)
+    if (startIndex >= totalHouses ) {
+      // If startIndex exceeds the total number of documents, return an appropriate error or default response
+      return res.status(404).json({ error: 'Requested page not found.' });
+    }
+    
+    console.log("query....", query)
+    const houses = await House.find(query)
+    .limit(limit)
+    .skip(startIndex)
+      
+
+    const results = {
+      totalHouses,
+      pageCount: Math.ceil(totalHouses / limit),
+      result: houses,
+    };
+
+    // Pagination links
+    if (startIndex > 0) {
+      results.previous = {
+        page: page - 1,
+      };
+    }
+    if (startIndex + houses.length < totalHouses) {
+      results.next = {
+        page: page + 1,
+      };
+      
+    } 
+   
+    console.log("minPrice........",minPrice)
+    console.log("minPrice........",maxPrice)
+    console.log("page........",page)
+    console.log("limit........",limit)
+    console.log("result........",results)
+    
+    res.status(200).json(results);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
 
 // Backend routes for fetching enum values
 router.get("/homeTypes/enumValues", async (req, res) => {
