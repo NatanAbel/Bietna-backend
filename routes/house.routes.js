@@ -33,13 +33,16 @@ router.get("/", async (req, res) => {
 
     const startIndex = (page - 1) * limit;
     
+    const totalHouses = await House.countDocuments();
+    if (startIndex >= totalHouses ) {
+      // If startIndex exceeds the total number of documents, return an appropriate error or default response
+      return res.status(404).json({ error: 'Requested page not found.' });
+    }
+    
     const houses = await House.find({}).skip(startIndex)
     .limit(limit);
     const results = {};
-    const housesForRent = houses.filter(house => house.availability.forRent)
-    // console.log("housesForRent....",housesForRent)
-    const housesForSale = houses.filter(house => house.availability.forSale)
-    const totalHouses = await House.countDocuments();
+
     
     results.totalHouses =  totalHouses
     results.pageCount = Math.ceil(totalHouses/ limit);
@@ -227,8 +230,6 @@ router.get("/search/result", async (req, res) => {
     const startIndex = (page - 1) * limit;
     const {search, forRent, forSale, minPrice, maxPrice, beds, bath, area, city, houseType, features, squareAreaMin, squareAreaMax} = req.query
     
-   
-
     let query = {};
     // Apply filters if provided
     if (forRent === "true") {
@@ -238,22 +239,24 @@ router.get("/search/result", async (req, res) => {
       query['availability.forSale'] = forSale === 'true';
     }
 
-    let priceFilters = [];
-    if (parseInt(minPrice) > 0 && !isNaN(parseInt(minPrice))) {
-      priceFilters.push(
-        { rentalPrice: { $gte: parseInt(minPrice) } },
-        { price: { $gte: parseInt(minPrice) } }
-      );
+    let rentalPriceFilter = {};
+    let salePriceFilter = {};
+
+    if (!isNaN(parseInt(minPrice)) && parseInt(minPrice) > 0) {
+      rentalPriceFilter['rentalPrice'] = { $gte: parseInt(minPrice) };
+      salePriceFilter['price'] = { $gte: parseInt(minPrice) };
     }
-    if (parseInt(maxPrice) > 0 && !isNaN(parseInt(maxPrice))) {
-      priceFilters.push(
-        { rentalPrice: { $lte: parseInt(maxPrice) } },
-        { price: { $lte: parseInt(maxPrice) } }
-      );
+    if (!isNaN(parseInt(maxPrice)) && parseInt(maxPrice) > 0) {
+      rentalPriceFilter['rentalPrice'] = rentalPriceFilter['rentalPrice'] || {};
+      rentalPriceFilter['rentalPrice'].$lte = parseInt(maxPrice);
+      salePriceFilter['price'] = salePriceFilter['price'] || {};
+      salePriceFilter['price'].$lte = parseInt(maxPrice);
     }
 
-    if (priceFilters.length > 0) {
-      query.$or = priceFilters;
+    if (Object.keys(rentalPriceFilter).length > 0 || Object.keys(salePriceFilter).length > 0) {
+      query.$or = [];
+      if (Object.keys(rentalPriceFilter).length > 0) query.$or.push(rentalPriceFilter);
+      if (Object.keys(salePriceFilter).length > 0) query.$or.push(salePriceFilter);
     }
 
     if (parseInt(beds) >1 && !isNaN(parseInt(beds))) {
@@ -282,23 +285,20 @@ router.get("/search/result", async (req, res) => {
     if (city) {
       query.city = { $regex: new RegExp(city, 'i') };
     }
-
     if (houseType) {
-      query.homeType = { $in: houseType.split(',') };
+      query.homeType = { $in: houseType };
     }
-
     if (features) {
-      query.features = { $all: features.split(',') };
+      query.features = { $all: features };
     }
     
     const totalHouses = await House.countDocuments(query);
-    console.log("totalHouses......",totalHouses)
     if (startIndex >= totalHouses ) {
       // If startIndex exceeds the total number of documents, return an appropriate error or default response
       return res.status(404).json({ error: 'Requested page not found.' });
     }
     
-    console.log("query....", query)
+
     const houses = await House.find(query)
     .limit(limit)
     .skip(startIndex)
@@ -322,12 +322,7 @@ router.get("/search/result", async (req, res) => {
       };
       
     } 
-   
-    console.log("minPrice........",minPrice)
-    console.log("minPrice........",maxPrice)
-    console.log("page........",page)
-    console.log("limit........",limit)
-    console.log("result........",results)
+  
     
     res.status(200).json(results);
   } catch (error) {
