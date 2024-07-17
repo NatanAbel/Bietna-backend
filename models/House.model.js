@@ -39,6 +39,12 @@ const houseSchema = new Schema(
       type: [String],
       required: [true, "Images are required"],
     },
+    latitude: {
+      type : Number
+    },
+  longitude: {
+    type : Number
+  },
     postedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
