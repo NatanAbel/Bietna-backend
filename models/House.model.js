@@ -33,17 +33,25 @@ const houseSchema = new Schema(
     },
     features: {
       type:[String],
-      enum:["swimming pool", "garage","outdoor space", "tense","fireplace","central heating/cooling","furnished","renovated", "elevator"]
+      enum:["pool", "garage","outdoor space","internet","tense","fireplace","heating/cooling","furnished","renovated", "elevator"]
     },
     images: {
       type: [String],
       required: [true, "Images are required"],
     },
     latitude: {
-      type : Number
+      type : Number, 
+      default: null, 
     },
   longitude: {
-    type : Number
+    type : Number, 
+    default: null, 
+  },
+  country: {
+    type: String,
+    // required: [true, "Country name is required."],
+    unique: true,
+    trim: true,
   },
     postedBy: {
       type: Schema.Types.ObjectId,

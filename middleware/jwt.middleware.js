@@ -1,31 +1,20 @@
-// middleware/jwt.middleware.js
+const jwt = require("jsonwebtoken");
 
-const { expressjwt: jwt } = require("express-jwt");
+const isAuthenticated = (req, res, next) => {
+  const authHeader = req.headers.authorization || req.headers.Authorization;
+  if (!authHeader?.startsWith("Bearer "))
+    return res.status(401).json({ message: "Unauthorized" });
+  const token = authHeader.split(" ")[1];
 
-// Instantiate the JWT token validation middleware
-const isAuthenticated = jwt({
-  secret: process.env.TOKEN_SECRET,
-  algorithms: ["HS256"],
-  requestProperty: 'payload', 
-  getToken: getTokenFromHeaders
-});
-
-
-// Function used to extracts the JWT token from the request's 'Authorization' Headers
-function getTokenFromHeaders (req) {
-  
-  // Check if the token is available on the request Headers
-  if (req.headers.authorization && req.headers.authorization.split(" ")[0] === "Bearer") {
-    // Get the encoded token string and return it
-    const token = req.headers.authorization.split(" ")[1];
-    return token;
-  } 
-  
-  return null;
-}
-
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) return res.status(403).json({ message: "Forbidden" }); //invalid token
+        req.user = decoded.data.user.userId
+        req.role = decoded.data.user.role
+        next()
+      });
+};
 
 // Export the middleware so that we can use it to create a protected routes
 module.exports = {
-  isAuthenticated
-}
+  isAuthenticated,
+};

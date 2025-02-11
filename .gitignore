@@ -1,6 +1,7 @@
 # Dependency directories
 node_modules/
-
+credentials.json
+# firebaseAdmin.js
 # Debug log from npm
 npm-debug.log
 
