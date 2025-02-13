@@ -151,6 +151,19 @@ router.post("/signup", async (req, res) => {
       res.status(400).json({ message: "Please fill all required fields" });
     }
 
+    // Username validation
+    if (userName.length < 4 || userName.length > 20) {
+      return res.status(400).json({
+        message: "Username must be between 4 and 20 characters."
+      });
+    }
+
+    if (!/^[a-zA-Z0-9_]+$/.test(userName)) {
+      return res.status(400).json({
+        message: "Username can only contain letters, numbers, and underscores."
+      });
+    }
+
     // Existing validation for disposable or fake domains
     const disposableDomains = [
       "mailinator.com",
@@ -175,6 +188,21 @@ router.post("/signup", async (req, res) => {
       return res
         .status(409)
         .json({ message: "Username or email already exists" });
+    }
+
+    // Additional password validation on server-side
+    if (
+      password.length < 8 ||
+      !/[A-Z]/.test(password) ||
+      !/[a-z]/.test(password) ||
+      !/\d/.test(password) ||
+      !/[@$!%*?&]/.test(password) ||
+      password.toLowerCase().includes(userName.toLowerCase())
+    ) {
+      return res.status(400).json({
+        message:
+          "Password must be at least 8 characters, contain uppercase, lowercase, a number, and a special character. It must not include the username.",
+      });
     }
 
     const salt = bcrypt.genSaltSync(13);
