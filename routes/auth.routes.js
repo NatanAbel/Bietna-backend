@@ -317,8 +317,8 @@ router.post("/login", loginLimiter, async (req, res) => {
         // res.status(200).json({ token });
         res.cookie("token", refreshToken, {
           httpOnly: true,
-          secure: process.env.NODE_ENV !== "development",
-          sameSite: process.env.NODE_ENV === "development" ? "Lax" : "None", // Use "Lax" in dev
+          secure:true,
+          sameSite:"None", // Use "Lax" in dev
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
@@ -381,8 +381,8 @@ router.get("/logout", (req, res) => {
   if (!cookies?.token) return res.sendStatus(204); // No content
   res.clearCookie("token", {
     httpOnly: "true",
-    sameSite: process.env.NODE_ENV === "development" ? "Lax" : "None", // Use "Lax" in dev,
-    secure: process.env.NODE_ENV !== "development",
+    sameSite: "None", // Use "Lax" in dev,
+    secure: true,
   });
   res.json({ message: "Cookie cleared" });
 });
@@ -433,8 +433,8 @@ router.post("/google", async (req, res, next) => {
       // res.status(200).json({ token });
       res.cookie("token", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV !== "development",
-        sameSite: process.env.NODE_ENV === "development" ? "Lax" : "None", // Use "Lax" in dev
+        secure: true,
+        sameSite:"None", // Use "Lax" in dev
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -497,8 +497,8 @@ router.post("/google", async (req, res, next) => {
       // res.status(200).json({ token });
       res.cookie("token", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV !== "development",
-        sameSite: process.env.NODE_ENV === "development" ? "Lax" : "None", // Use "Lax" in dev
+        secure: true,
+        sameSite: "None", // Use "Lax" in dev
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
