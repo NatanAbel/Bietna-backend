@@ -548,6 +548,7 @@ router.get("/search/result", async (req, res) => {
     // Whitelist of allowed query parameters
     const allowedFields = [
       "search",
+      "country",
       "forRent",
       "forSale",
       "minPrice",
@@ -556,7 +557,6 @@ router.get("/search/result", async (req, res) => {
       "bath",
       "area",
       "city",
-      "country",
       "houseType",
       "features",
       "squareAreaMin",
@@ -565,17 +565,38 @@ router.get("/search/result", async (req, res) => {
 
     // Sanitize and whitelist input
     const sanitizedQuery = {};
+    // allowedFields.forEach((field) => {
+    //   if (req.query[field]) {
+    //     sanitizedQuery[field] = sanitize(req.query[field], {
+    //       allowedTags: [],
+    //       allowedAttributes: {},
+    //     });
+    //   }
+    // });
     allowedFields.forEach((field) => {
       if (req.query[field]) {
-        sanitizedQuery[field] = sanitize(req.query[field], {
-          allowedTags: [],
-          allowedAttributes: {},
-        });
+        // Handle arrays (like houseType and features) differently
+        if (Array.isArray(req.query[field])) {
+          // Sanitize each array element individually
+          sanitizedQuery[field] = req.query[field].map(item => 
+            sanitize(item, {
+              allowedTags: [],
+              allowedAttributes: {},
+            })
+          );
+        } else {
+          // Handle regular string values
+          sanitizedQuery[field] = sanitize(req.query[field], {
+            allowedTags: [],
+            allowedAttributes: {},
+          });
+        }
       }
     });
 
     const {
       search,
+      country,
       forRent,
       forSale,
       minPrice,
@@ -584,7 +605,6 @@ router.get("/search/result", async (req, res) => {
       bath,
       area,
       city,
-      country,
       houseType,
       features,
       squareAreaMin,
@@ -659,15 +679,18 @@ router.get("/search/result", async (req, res) => {
       query.city = query.city || {};
       query.city.$regex = new RegExp(city, "i");
     }
+    
     if (country) {
       query.country = query.country || {};
       query.country.$regex = new RegExp(country, "i");
     }
+    
     if (houseType) {
-      query.homeType = { $in: houseType };
+      query.homeType = { $in: Array.isArray(houseType) ? houseType : [houseType] };
     }
+    
     if (features) {
-      query.features = { $all: features };
+      query.features = { $all: Array.isArray(features) ? features : [features] };
     }
 
     // Get all matching houses
