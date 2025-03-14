@@ -61,12 +61,16 @@ router.get("/", async (req, res) => {
       return res.status(404).json({ error: "Requested page not found." });
     }
 
-    const houses = await House.find({});
+    // const houses = await House.find({});
 
-    const paginatedHouses = houses.slice(startIndex, startIndex + limit);
+    // const paginatedHouses = houses.slice(startIndex, startIndex + limit);
 
-    const uniqueAreas = [...new Set(houses.map((house) => house.address))];
-    const uniqueCities = [...new Set(houses.map((house) => house.city))];
+    const paginatedHouses = await House.find({})
+  .skip(startIndex)
+  .limit(limit);
+
+    const uniqueAreas = [...new Set(paginatedHouses.map((house) => house.address))];
+    const uniqueCities = [...new Set(paginatedHouses.map((house) => house.city))];
 
     const results = {
       totalHouses,
@@ -89,10 +93,12 @@ router.get("/", async (req, res) => {
         page: page - 1,
       };
     }
-
+     // Add cache headers
+     res.set('Cache-Control', 'public, max-age=300');
     res.status(200).json(results);
   } catch (err) {
     console.error(err);
+    res.status(500).json({ error: "Server error" });
   }
 });
 
@@ -101,6 +107,8 @@ router.get("/:houseId", async (req, res) => {
   const { houseId } = req.params;
   try {
     const house = await House.findById(houseId).populate("postedBy");
+    // Add cache headers
+    res.set('Cache-Control', 'public, max-age=300');
     res.status(200).json(house);
   } catch (err) {
     console.error(err);
@@ -344,7 +352,8 @@ router.post(
       });
 
       const findHouse = await House.findById(newHouse._id).populate("postedBy");
-
+       // Add before sending response:
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
       res.status(201).json(findHouse);
     } catch (err) {
       console.error(err);
@@ -483,6 +492,8 @@ router.put(
         }
       );
 
+      // Add before sending response:
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
       res.status(200).json(updateHouse);
     } catch (err) {
       console.error("Error updating house:", err);
@@ -533,6 +544,8 @@ router.delete("/:houseId/image", isAuthenticated, async (req, res) => {
 
     await house.save();
 
+    // Add before sending response:
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.status(200).json({ message: "Image deleted successfully" });
   } catch (error) {
     console.error("Error deleting image:", error);
@@ -565,14 +578,7 @@ router.get("/search/result", async (req, res) => {
 
     // Sanitize and whitelist input
     const sanitizedQuery = {};
-    // allowedFields.forEach((field) => {
-    //   if (req.query[field]) {
-    //     sanitizedQuery[field] = sanitize(req.query[field], {
-    //       allowedTags: [],
-    //       allowedAttributes: {},
-    //     });
-    //   }
-    // });
+    
     allowedFields.forEach((field) => {
       if (req.query[field]) {
         // Handle arrays (like houseType and features) differently
@@ -749,6 +755,9 @@ router.get("/search/result", async (req, res) => {
         page: page + 1,
       };
     }
+
+      // Add before sending response:
+    res.set('Cache-Control', 'public, max-age=300'); // 5 minutes
     res.status(200).json(results);
   } catch (error) {
     console.error(error);
@@ -760,6 +769,8 @@ router.get("/search/result", async (req, res) => {
 router.get("/homeTypes/enumValues", async (req, res) => {
   try {
     const enumValues = House.schema.path("homeType").options.enum;
+    // Cache longer for static data
+    res.set('Cache-Control', 'public, max-age=86400'); // 24 hours
     res.status(200).json(enumValues);
   } catch (err) {
     console.error(err);
@@ -772,6 +783,8 @@ router.get("/homeTypes/enumValues", async (req, res) => {
 router.get("/enumValues/features", async (req, res) => {
   try {
     const enumValues = House.schema.path("features").options.enum;
+    // Cache longer for static data
+    res.set('Cache-Control', 'public, max-age=86400'); // 24 hours
     res.status(200).json(enumValues);
   } catch (err) {
     console.error(err);
@@ -838,7 +851,8 @@ router.delete("/:houseId/delete", isAuthenticated, async (req, res) => {
     );
 
     const deleteHouse = await House.findByIdAndDelete(houseId);
-
+    // Add before sending response:
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.status(204).json({ message: "House deleted", deleteHouse });
   } catch (err) {
     console.error(err);

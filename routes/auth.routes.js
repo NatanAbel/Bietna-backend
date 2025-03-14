@@ -239,6 +239,9 @@ router.post("/signup", async (req, res) => {
     // });
 
     await user.save();
+
+    // Add before sending response:
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.status(201).json({ message: "User Created" });
   } catch (err) {
     console.error("Error during signup:", err);
@@ -324,6 +327,8 @@ router.post("/login", loginLimiter, async (req, res) => {
 
         // const { password, role, ...user } = currentUser._doc;
 
+        // Add before sending response:
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         res.json({ accessToken });
       } else {
         res.status(401).json({ message: "Wrong username or password !" });
@@ -361,6 +366,9 @@ router.get("/refresh", async (req, res) => {
           process.env.ACCESS_TOKEN_SECRET,
           { expiresIn: "15m" }
         );
+
+         // Add inside the jwt.verify callback before sending response:
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         res.json({ accessToken });
       })
     );
@@ -384,6 +392,9 @@ router.get("/logout", (req, res) => {
     sameSite: "None", // Use "Lax" in dev,
     secure: true,
   });
+
+  // Add before sending response:
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   res.json({ message: "Cookie cleared" });
 });
 
@@ -438,6 +449,8 @@ router.post("/google", async (req, res, next) => {
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
+       // Add before sending response:
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
       res.status(200).json({ accessToken });
     } else {
       const generatedPassword =
@@ -502,6 +515,8 @@ router.post("/google", async (req, res, next) => {
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
+      // Add before sending response:
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
       res.status(200).json({ accessToken });
     }
   } catch (err) {
@@ -519,6 +534,8 @@ router.get("/verify", isAuthenticated, async (req, res) => {
     const verifyUser = await User.findById(userId);
     const { password, role, ...verified } = verifyUser._doc;
 
+    // Add before sending response:
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.status(200).json({ verified });
   } catch (err) {
     console.error(err);
@@ -581,6 +598,8 @@ router.get("/profile", isAuthenticated, async (req, res) => {
     user.favorites = favoritesArr;
     user.savedSearches = savedSearchesArr;
 
+    // Add before sending response:
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.status(200).json({ user });
   } catch (err) {
     console.error(err);
@@ -679,6 +698,8 @@ router.put(
 
       const { password, role, ...updatedUser } = userUpdated._doc;
 
+      // Add before sending response:
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
       res.status(200).json(updatedUser);
     } catch (err) {
       console.error("Error during profile update:", err);
@@ -859,6 +880,8 @@ router.put(
             .populate("favorites")
             .populate("savedSearches");
 
+          // Add before sending response:
+          res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
           res.status(200).json(updatedUser);
           // Update the user document in MongoDB with the new profile image URL
           // updateData.profilePicture = downloadUrl;
@@ -910,6 +933,9 @@ router.put(
               .populate("published")
               .populate("favorites")
               .populate("savedSearches");
+
+            // Add before sending response:
+            res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
             res.status(200).json(updatedUser);
           } catch (err) {
             console.error(`Failed to delete file :`, err);
@@ -1054,6 +1080,8 @@ router.delete("/delete", isAuthenticated, async (req, res) => {
       // Delete the user from the mongoDb collection
       await User.findByIdAndDelete(userId);
 
+      // Add before sending response:
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
       res.status(200).json({ message: "User and associated data deleted" });
     } else {
       res.status(400).json({ message: "User ID not provided" });
