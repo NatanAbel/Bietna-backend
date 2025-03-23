@@ -12,6 +12,7 @@ const { bucket } = require("../firebaseAdmin");
 const sharp = require("sharp"); //Sharp is a high-performance Node.js image processing library that supports image compression and resizing.
 const { v4: uuidv4 } = require("uuid");
 const sanitize = require("sanitize-html");
+const { gallaryImageUpload, gallaryValidateFiles, sanitizeHouseResponse } = require("../methods/gallaryFileHandler.js");
 // Multer is used to parse data multipart/form-data request body and handle file uploads
 // memoryStorage(): Stores files temporarily in the server's RAM (memory)
 const storage = multer.memoryStorage();
@@ -45,6 +46,16 @@ const giveCurrentDateTime = () => {
   const time =
     today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds();
   return `${date} ${time}`;
+}
+
+// Decode the house ID before querying
+const decodeId = (encodedId) => {
+  if (!encodedId) return null;
+  
+  if (encodedId.startsWith('house_')) {
+    return Buffer.from(encodedId.replace('house_', ''), 'base64').toString();
+  }
+  return encodedId;
 };
 
 // get all Houses
@@ -72,10 +83,15 @@ router.get("/", async (req, res) => {
     const uniqueAreas = [...new Set(paginatedHouses.map((house) => house.address))];
     const uniqueCities = [...new Set(paginatedHouses.map((house) => house.city))];
 
+    // Use Promise.all since sanitizeHouseResponse is async
+    const sanitizedHouses = await Promise.all(
+      paginatedHouses.map(house => sanitizeHouseResponse(house))
+    );
+
     const results = {
       totalHouses,
       pageCount: Math.ceil(totalHouses / limit),
-      result: paginatedHouses,
+      result: sanitizedHouses,
       uniqueAreas,
       uniqueCities,
     };
@@ -106,109 +122,20 @@ router.get("/", async (req, res) => {
 router.get("/:houseId", async (req, res) => {
   const { houseId } = req.params;
   try {
-    const house = await House.findById(houseId).populate("postedBy");
+    // Decode the house ID before querying
+    const decodedHouseId = decodeId(houseId);
+
+    const house = await House.findById(decodedHouseId).populate("postedBy");
+
+    const sanitizedHouse = await sanitizeHouseResponse(house);
+
     // Add cache headers
     res.set('Cache-Control', 'public, max-age=300');
-    res.status(200).json(house);
+    res.status(200).json(sanitizedHouse);
   } catch (err) {
     console.error(err);
   }
 });
-
-
-const validateFiles = (files) => {
-  const validTypes = ["image/jpeg", "image/png", "image/gif"];
-  const maxSize = 5 * 1024 * 1024; // 5MB
-
-  // Define valid magic bytes (file signatures)
-  const validSignatures = {
-    "image/jpeg": [0xff, 0xd8], // JPEG (FFD8)
-    "image/png": [0x89, 0x50], // PNG (8950)
-    "image/gif": [0x47, 0x49], // GIF (4749)
-  };
-
-  for (const file of files) {
-    // MIME Type Check (based on file extension or metadata)
-    const mimeType = file.mimetype; // Get MIME type based on file extension
-
-    if (!mimeType || !validTypes.includes(mimeType)) {
-      return {
-        valid: false,
-        message: "Invalid MIME type",
-      };
-    }
-
-    // File Size Check
-    if (file.size > maxSize) {
-      return {
-        valid: false,
-        message: "File size exceeds the 5MB limit",
-      };
-    }
-
-    // Magic Byte Validation
-    const fileBuffer = file.buffer.slice(0, validSignatures[mimeType].length); // Slice enough bytes for the signature
-    const signature = [...fileBuffer];
-
-    // Check the magic bytes for the expected MIME type
-    const expectedSignature = validSignatures[mimeType];
-
-    if (
-      !expectedSignature ||
-      !signature.every((byte, idx) => byte === expectedSignature[idx])
-    ) {
-      return {
-        valid: false,
-        message: "Invalid file signature (magic bytes) or MIME type mismatch",
-      };
-    }
-  }
-
-  return { valid: true };
-};
-
-const sanitizeFileName = (originalName) => {
-  const sanitized = originalName
-    .replace(/[^a-zA-Z0-9_-]/g, "_")
-    .slice(0, 100)
-    .replace(/\.\.+/, "_"); // Remove dangerous characters like "..";
-  const uniqueSuffix = uuidv4(); // Use UUID for uniqueness
-  return sanitized + "-" + uniqueSuffix;
-};
-
-// Background job for processing image uploads
-const processImageUpload = async (file, userId, timestamp) => {
-  const sanitizedFileName = sanitizeFileName(file.originalname);
-
-  try {
-    // Sanitize image (resize and optimize)
-    const sanitizedImage = await sharp(file.buffer)
-      .resize(800, 800, { fit: "inside" }) // Resize to max 800x800
-      .toBuffer();
-
-    const filePath = `house_images/${userId}/${sanitizedFileName}-${timestamp}`;
-    const blob = bucket.file(filePath);
-    const blobStream = blob.createWriteStream({
-      resumable: false,
-      contentType: file.mimetype,
-      predefinedAcl: "publicRead", // Public bucket access
-    });
-
-    return new Promise((resolve, reject) => {
-      blobStream.on("error", (err) => reject(err));
-
-      blobStream.on("finish", () => {
-        const publicUrl = `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/${filePath}`;
-        resolve(publicUrl);
-      });
-
-      blobStream.end(sanitizedImage);
-    });
-  } catch (error) {
-    console.error("Error processing image:", error);
-    throw error;
-  }
-};
 
 // Creating a new house
 router.post(
@@ -284,7 +211,7 @@ router.post(
         return res.status(400).json({ message: "No files uploaded." });
       }
 
-      const fileValidation = validateFiles(req.files);
+      const fileValidation = await gallaryValidateFiles(req.files);
       if (!fileValidation.valid) {
         return res.status(400).json({ message: fileValidation.message });
       }
@@ -299,7 +226,7 @@ router.post(
 
       // Promise.allSettled() uses to gracefully handle partial upload failures.
       const ImageURLs = await Promise.allSettled(
-        req.files.map((file) => processImageUpload(file, userId, dateTime))
+        req.files.map((file) => gallaryImageUpload(file, userId, dateTime))
       );
 
       const successfulUploads = ImageURLs.filter(
@@ -374,6 +301,9 @@ router.put(
       const body = { ...req.body };
       const { houseId } = req.params;
       const userId = req.user;
+
+      const decodedHouseId = decodeId(houseId);
+
       // Whitelist of allowed fields
       const allowedFields = [
         "address",
@@ -428,7 +358,7 @@ router.put(
       });
 
       // Validate the house ID
-      const house = await House.findById(houseId);
+      const house = await House.findById(decodedHouseId);
       if (!house) {
         return res.status(404).json({ message: "House not found." });
       }
@@ -441,7 +371,7 @@ router.put(
       }
 
       if (req.files || req.files.length !== 0) {
-        const fileValidation = validateFiles(req.files);
+        const fileValidation = await gallaryValidateFiles(req.files);
 
         if (!fileValidation.valid) {
           return res.status(400).json({ message: fileValidation.message });
@@ -462,7 +392,7 @@ router.put(
 
         // Process image uploads
         const ImageURLs = await Promise.allSettled(
-          req.files.map((file) => processImageUpload(file, userId, dateTime))
+          req.files.map((file) => gallaryImageUpload(file, userId, dateTime))
         );
 
         const successfulUploads = ImageURLs.filter(
@@ -485,16 +415,18 @@ router.put(
 
       // Append the new images to the existing images
       const updateHouse = await House.findByIdAndUpdate(
-        houseId,
+        decodedHouseId,
         sanitizedData,
         {
           new: true,
         }
       );
 
+      const sanitizedHouse = await sanitizeHouseResponse(updateHouse);
+
       // Add before sending response:
       res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-      res.status(200).json(updateHouse);
+      res.status(200).json(sanitizedHouse);
     } catch (err) {
       console.error("Error updating house:", err);
       res.status(500).json({ message: "Internal server error" });
@@ -502,12 +434,16 @@ router.put(
   }
 );
 
+// Deleting a house image
 router.delete("/:houseId/image", isAuthenticated, async (req, res) => {
   try {
     const { houseId } = req.params;
     const { imageUrl } = req.body;
 
-    const house = await House.findById(houseId);
+    // Decode the house ID before querying
+    const decodedHouseId = decodeId(houseId);
+
+    const house = await House.findById(decodedHouseId);
     if (!house) {
       return res.status(404).json({ message: "House not found" });
     }
@@ -553,6 +489,7 @@ router.delete("/:houseId/image", isAuthenticated, async (req, res) => {
   }
 });
 
+// Search for houses
 router.get("/search/result", async (req, res) => {
   try {
     const page = parseInt(req.query.page) || 1;
@@ -736,10 +673,14 @@ router.get("/search/result", async (req, res) => {
 
     const paginatedHouses = allHouses.slice(startIndex, startIndex + limit);
 
+    const sanitizedResults = await Promise.all(
+      paginatedHouses.map(house => sanitizeHouseResponse(house))
+    );
+
     const results = {
       totalHouses,
       pageCount: Math.ceil(totalHouses / limit),
-      result: paginatedHouses,
+      result: sanitizedResults,
       uniqueAreas,
       uniqueCities,
     };
@@ -794,14 +735,19 @@ router.get("/enumValues/features", async (req, res) => {
   }
 });
 
+// Delete a house
 router.delete("/:houseId/delete", isAuthenticated, async (req, res) => {
   const { houseId } = req.params;
   // const userId = req.payload.data.user.userId;
   const userId = req.user;
 
   try {
+
+    // Decode the house ID before querying
+    const decodedHouseId = decodeId(houseId);
+
     // Find the house to get the image filenames
-    const house = await House.findById(houseId).populate("postedBy");
+    const house = await House.findById(decodedHouseId).populate("postedBy");
 
     if (!house) {
       return res.status(404).json({ message: "House not found" });
@@ -841,16 +787,16 @@ router.delete("/:houseId/delete", isAuthenticated, async (req, res) => {
     );
     // Remove the houseId from the published and favorites arrays of the user who posted the house
     const user = await User.findByIdAndUpdate(userId, {
-      $pull: { published: houseId, favorites: houseId },
+      $pull: { published: decodedHouseId, favorites: decodedHouseId },
     });
 
     // Remove the houseId from the favorites arrays of all users who have it
     await User.updateMany(
-      { favorites: houseId },
-      { $pull: { favorites: houseId } }
+      { favorites: decodedHouseId },
+      { $pull: { favorites: decodedHouseId } }
     );
 
-    const deleteHouse = await House.findByIdAndDelete(houseId);
+    const deleteHouse = await House.findByIdAndDelete(decodedHouseId);
     // Add before sending response:
     res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
     res.status(204).json({ message: "House deleted", deleteHouse });

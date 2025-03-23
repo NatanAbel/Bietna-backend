@@ -27,7 +27,7 @@ module.exports = (app) => {
       origin: [FRONTEND_URL],
       credentials:true,
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Cookie","Cache-Control"],
+    allowedHeaders: ["Content-Type", "Authorization", "Cookie","Cache-Control","X-Requested-With"],
     exposedHeaders: ["set-cookie"]
     })
   );

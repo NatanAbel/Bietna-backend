@@ -19,11 +19,10 @@ const { refreshToken } = require("firebase-admin/app");
 const router = express.Router();
 const asyncHandler = require("express-async-handler");
 const { bucket, auth, firestore } = require("../firebaseAdmin");
-const sharp = require("sharp");
-const { v4: uuidv4 } = require("uuid");
 const { multerErrorHandler } = require("../middleware/multerErrorHandler.js");
 const sanitize = require("sanitize-html");
-// const vision = require("@google-cloud/vision");
+const { sanitizeImageUrl, sanitizeUser, populatedHouse } = require("../methods/sanitizeMethods.js");
+const { processImageUpload, validateFiles } = require("../methods/imageFileHandlers.js");
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -33,7 +32,9 @@ const upload = multer({
   },
 });
 
+// Default image url
 const DEFAULT_IMG_URL = process.env.PROFILE_DEFAULT_IMG_URL;
+
 const giveCurrentDateTime = () => {
   const today = new Date();
   const date =
@@ -59,6 +60,16 @@ const checkWithVirusTotal = async (fileBuffer) => {
   } catch (error) {
     throw new Error("VirusTotal scan failed or file flagged as malicious.");
   }
+};
+
+// Decode the house ID before querying
+const decodeId = (encodedId) => {
+  if (!encodedId) return null;
+  
+  if (encodedId.startsWith('house_')) {
+    return Buffer.from(encodedId.replace('house_', ''), 'base64').toString();
+  }
+  return encodedId;
 };
 
 // Nodemailer setup
@@ -154,13 +165,13 @@ router.post("/signup", async (req, res) => {
     // Username validation
     if (userName.length < 4 || userName.length > 20) {
       return res.status(400).json({
-        message: "Username must be between 4 and 20 characters."
+        message: "Username must be between 4 and 20 characters.",
       });
     }
 
     if (!/^[a-zA-Z0-9_]+$/.test(userName)) {
       return res.status(400).json({
-        message: "Username can only contain letters, numbers, and underscores."
+        message: "Username can only contain letters, numbers, and underscores.",
       });
     }
 
@@ -241,7 +252,7 @@ router.post("/signup", async (req, res) => {
     await user.save();
 
     // Add before sending response:
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
     res.status(201).json({ message: "User Created" });
   } catch (err) {
     console.error("Error during signup:", err);
@@ -277,6 +288,16 @@ router.post("/signup", async (req, res) => {
 router.post("/login", loginLimiter, async (req, res) => {
   const body = req.body;
   try {
+
+    // Add security headers
+    res.set({
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block',
+      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private'
+    });
+
     //find if the user exists
     if (!body.userName || !body.password)
       return res.status(400).json({ message: "All fields are required!!" });
@@ -284,11 +305,6 @@ router.post("/login", loginLimiter, async (req, res) => {
     const user = await User.find({ userName: body.userName }).exec();
 
     if (user.length > 0) {
-      // if (!user[0].isVerified) {
-      //   return res
-      //     .status(403)
-      //     .json({ message: "Please verify your email to login !" });
-      // }
 
       const currentUser = user[0];
       const passwordCheck = bcrypt.compareSync(
@@ -317,18 +333,13 @@ router.post("/login", loginLimiter, async (req, res) => {
           { expiresIn: "1d" }
         );
 
-        // res.status(200).json({ token });
         res.cookie("token", refreshToken, {
           httpOnly: true,
-          secure:true,
-          sameSite:"None", // Use "Lax" in dev
+          secure: true,
+          sameSite: "None", // Use "Lax" in dev
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
-        // const { password, role, ...user } = currentUser._doc;
-
-        // Add before sending response:
-        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
         res.json({ accessToken });
       } else {
         res.status(401).json({ message: "Wrong username or password !" });
@@ -367,8 +378,11 @@ router.get("/refresh", async (req, res) => {
           { expiresIn: "15m" }
         );
 
-         // Add inside the jwt.verify callback before sending response:
-        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+        // Add inside the jwt.verify callback before sending response:
+        res.set(
+          "Cache-Control",
+          "no-store, no-cache, must-revalidate, private"
+        );
         res.json({ accessToken });
       })
     );
@@ -394,7 +408,7 @@ router.get("/logout", (req, res) => {
   });
 
   // Add before sending response:
-  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+  res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
   res.json({ message: "Cookie cleared" });
 });
 
@@ -445,12 +459,12 @@ router.post("/google", async (req, res, next) => {
       res.cookie("token", refreshToken, {
         httpOnly: true,
         secure: true,
-        sameSite:"None", // Use "Lax" in dev
+        sameSite: "None", // Use "Lax" in dev
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
-       // Add before sending response:
-      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      // Add before sending response:
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
       res.status(200).json({ accessToken });
     } else {
       const generatedPassword =
@@ -516,7 +530,7 @@ router.post("/google", async (req, res, next) => {
       });
 
       // Add before sending response:
-      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
       res.status(200).json({ accessToken });
     }
   } catch (err) {
@@ -525,6 +539,7 @@ router.post("/google", async (req, res, next) => {
   }
 });
 
+
 router.get("/verify", isAuthenticated, async (req, res) => {
   // const userId = req.payload.data.user.userId;
   const userId = req.user;
@@ -532,18 +547,22 @@ router.get("/verify", isAuthenticated, async (req, res) => {
   if (!userId) return res.status(401).json({ message: "Invalid user" });
   try {
     const verifyUser = await User.findById(userId);
-    const { password, role, ...verified } = verifyUser._doc;
+
+    if (!verifyUser) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    const sanitizedUser = await sanitizeUser(verifyUser);
 
     // Add before sending response:
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-    res.status(200).json({ verified });
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+    res.status(200).json({ verified : sanitizedUser });
   } catch (err) {
     console.error(err);
   }
 });
 
 router.get("/profile", isAuthenticated, async (req, res) => {
-  // const userId = req.payload.data.user.userId;
 
   const userId = req.user;
 
@@ -552,54 +571,27 @@ router.get("/profile", isAuthenticated, async (req, res) => {
       .populate("published")
       .populate("favorites")
       .populate("savedSearches");
-    let published = userFound.published;
-    let favorites = userFound.favorites;
-    let savedSearches = userFound.savedSearches;
 
-    const publishedArr = [];
-    const favoritesArr = [];
-    const savedSearchesArr = [];
+      if (!userFound) {
+        return res.status(404).json({ message: "User not found" });
+      }
 
-    if (
-      published.length > 0 ||
-      favorites.length > 0 ||
-      savedSearches.length > 0
-    ) {
-      const houses = await Promise.all(
-        published.map(async (house) => {
-          const publishedHouse = await House.findById(house._id).populate(
-            "postedBy"
-          );
+    // Sanitize user data before sending
+    const safeUser = await sanitizeUser(userFound);
 
-          publishedArr.push(publishedHouse);
-        })
-      );
-      const userFavorites = await Promise.all(
-        favorites.map(async (house) => {
-          const favoriteHouses = await House.findById(house._id).populate(
-            "postedBy"
-          );
+    // Get populated house data
+    const houseData = await populatedHouse(safeUser);
 
-          favoritesArr.push(favoriteHouses);
-        })
-      );
-      const userSavedSearch = await Promise.all(
-        savedSearches.map(async (house) => {
-          const searchedHouses = await House.findById(house._id).populate(
-            "postedBy"
-          );
-
-          savedSearchesArr.push(searchedHouses);
-        })
-      );
-    }
-    const { password, role, ...user } = userFound._doc;
-    user.published = publishedArr;
-    user.favorites = favoritesArr;
-    user.savedSearches = savedSearchesArr;
+    // Create a clean user object
+    const user = {
+      ...safeUser,
+      published: houseData.publishedArr,
+      favorites: houseData.favoritesArr,
+      savedSearches: houseData.savedSearchesArr,
+    };
 
     // Add before sending response:
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
     res.status(200).json({ user });
   } catch (err) {
     console.error(err);
@@ -613,28 +605,58 @@ router.put(
   async (req, res) => {
     const userId = req.user;
     const sanitizedData = {};
-    const allowedFields = [
-      "userName",
-      "email",
-      "firstName",
-      "lastName",
-      "bio",
-      "published",
-      "savedSearches",
-      "phoneNumber",
-    ];
 
-    // Sanitize and whitelist fields
-    allowedFields.forEach((field) => {
-      if (req.body[field]) {
-        sanitizedData[field] = sanitize(req.body[field], {
+    try {
+      const allowedFields = [
+        "userName",
+        "firstName",
+        "lastName",
+        "bio",
+        "published",
+        "savedSearches",
+      ];
+
+      // Sanitize and whitelist fields
+      allowedFields.forEach((field) => {
+        if (req.body[field]) {
+          sanitizedData[field] = sanitize(req.body[field], {
+            allowedTags: [],
+            allowedAttributes: {},
+          });
+        }
+      });
+
+      // Special handling for email with additional validation
+      if (req.body.email !== undefined) {
+        // Skip masked emails
+        if (req.body.email.includes("***")) {
+          console.log("Skipping masked email update");
+        } else {
+          // Validate email format
+          const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+          if (!emailRegex.test(req.body.email)) {
+            return res.status(400).json({ message: "Invalid email format" });
+          }
+
+          sanitizedData.email = sanitize(req.body.email, {
+            allowedTags: [],
+            allowedAttributes: {},
+          });
+        }
+      }
+
+      // Special handling for phone number
+      if (
+        req.body.phoneNumber !== undefined &&
+        !req.body.phoneNumber.includes("****")
+      ) {
+        // Add phone validation if needed
+        sanitizedData.phoneNumber = sanitize(req.body.phoneNumber, {
           allowedTags: [],
           allowedAttributes: {},
         });
       }
-    });
 
-    try {
       const userFound = await User.findById(userId);
 
       if (!userFound) {
@@ -644,14 +666,14 @@ router.put(
       // Handle favorites separately to avoid conflicts
       if (req.body.favorites) {
         const favoriteId = req.body.favorites;
-
+        const decodedFavoriteId = decodeId(favoriteId);
         // Check if it's a valid ObjectId
-        if (!mongoose.Types.ObjectId.isValid(favoriteId)) {
+        if (!mongoose.Types.ObjectId.isValid(decodedFavoriteId)) {
           return res.status(400).json({ message: "Invalid favorite ID" });
         }
 
         // Sanitize `favorites` ID (optional, as ObjectId validation already ensures safety)
-        const sanitizedFavoriteId = sanitize(favoriteId, {
+        const sanitizedFavoriteId = sanitize(decodedFavoriteId, {
           allowedTags: [],
           allowedAttributes: {},
         });
@@ -669,20 +691,6 @@ router.put(
 
         // Save the updated user
         await userFound.save();
-
-        // if (isFavorite) {
-        //   // Remove the favorite
-        //   await User.updateOne(
-        //     { _id: userId },
-        //     { $pull: { favorites: favoriteId } }
-        //   );
-        // } else {
-        //   // Add to favorites
-        //   await User.updateOne(
-        //     { _id: userId },
-        //     { $addToSet: { favorites: favoriteId } }
-        //   );
-        // }
       }
 
       // Update other fields
@@ -696,109 +704,29 @@ router.put(
         .populate("favorites")
         .populate("savedSearches");
 
-      const { password, role, ...updatedUser } = userUpdated._doc;
+      // Use the sanitizeUser function and properly handle populated data
+      const safeUser = await sanitizeUser(userUpdated);
+
+      // Get populated house data
+      const houseData = await populatedHouse(safeUser);
+
+      // Create a clean user object
+      const user = {
+        ...safeUser,
+        published: houseData.publishedArr,
+        favorites: houseData.favoritesArr,
+        savedSearches: houseData.savedSearchesArr,
+      };
 
       // Add before sending response:
-      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-      res.status(200).json(updatedUser);
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
+      res.status(200).json(user);
     } catch (err) {
       console.error("Error during profile update:", err);
       res.status(500).json({ message: "Internal server error" });
     }
   }
 );
-
-const validateFiles = async (file) => {
-  const validTypes = ["image/jpeg", "image/png", "image/gif"];
-  const maxSize = 5 * 1024 * 1024; // 5MB
-  // Debug here
-  // Define valid magic bytes (file signatures)
-  const validSignatures = {
-    "image/jpeg": [0xff, 0xd8], // JPEG (FFD8)
-    "image/png": [0x89, 0x50], // PNG (8950)
-    "image/gif": [0x47, 0x49], // GIF (4749)
-  };
-
-  // MIME Type Check (based on file extension or metadata)
-  const mimeType = file.mimetype; // Get MIME type based on file extension
-
-  if (!mimeType || !validTypes.includes(mimeType)) {
-    return {
-      valid: false,
-      message: "Invalid MIME type",
-    };
-  }
-
-  // File Size Check
-  if (file.size > maxSize) {
-    return {
-      valid: false,
-      message: "File size exceeds the 5MB limit",
-    };
-  }
-
-  // Magic Byte Validation
-  const fileBuffer = file.buffer.slice(0, validSignatures[mimeType].length); // Slice enough bytes for the signature
-  const signature = [...fileBuffer];
-
-  // Check the magic bytes for the expected MIME type
-  const expectedSignature = validSignatures[mimeType];
-
-  if (
-    !expectedSignature ||
-    !signature.every((byte, idx) => byte === expectedSignature[idx])
-  ) {
-    return {
-      valid: false,
-      message: "Invalid file signature (magic bytes) or MIME type mismatch",
-    };
-  }
-
-  return { valid: true };
-};
-
-const sanitizeFileName = (originalName) => {
-  const sanitized = originalName
-    .replace(/[^a-zA-Z0-9_-]/g, "_")
-    .slice(0, 100)
-    .replace(/\.\.+/, "_"); // Remove dangerous characters like "..";
-  const uniqueSuffix = uuidv4(); // Use UUID for uniqueness
-  return sanitized + "-" + uniqueSuffix;
-};
-
-// Background job for processing image uploads
-const processImageUpload = async (file, userId, timestamp) => {
-  const sanitizedFileName = sanitizeFileName(file.originalname);
-
-  try {
-    // Sanitize image (resize and optimize)
-    const sanitizedImage = await sharp(file.buffer)
-      .resize(800, 800, { fit: "inside" }) // Resize to max 800x800
-      .toBuffer();
-
-    const filePath = `profile_picture/${userId}/${sanitizedFileName}-${timestamp}`;
-    const blob = bucket.file(filePath);
-    const blobStream = blob.createWriteStream({
-      resumable: false,
-      contentType: file.mimetype,
-      predefinedAcl: "publicRead", // Useing private ACL to restrict access
-    });
-
-    return new Promise((resolve, reject) => {
-      blobStream.on("error", (err) => reject(err));
-
-      blobStream.on("finish", () => {
-        const publicUrl = `https://storage.googleapis.com/${process.env.FIREBASE_STORAGE_BUCKET}/${filePath}`;
-        resolve(publicUrl);
-      });
-
-      blobStream.end(sanitizedImage);
-    });
-  } catch (error) {
-    console.error("Error processing image:", error);
-    throw error;
-  }
-};
 
 router.put(
   "/profile-picture/update",
@@ -875,14 +803,41 @@ router.put(
             }
           );
 
+
+          // Get the sanitized URL before sending response
+          const sanitizedUrl = await sanitizeImageUrl(downloadUrl, userId);
+
           const updatedUser = await User.findById(userId)
             .populate("published")
             .populate("favorites")
             .populate("savedSearches");
 
+          // Sanitize user data before sending
+          // const safeUser = await sanitizeUser(updatedUser);
+
+          // Create response with the new sanitized URL
+          const safeUser = await sanitizeUser({
+            ...updatedUser.toObject(),
+            profilePicture: sanitizedUrl // Use the sanitized URL directly
+          });
+
+          // Get populated house data
+          const houseData = await populatedHouse(safeUser);
+
+          // Create a clean user object
+          const user = {
+            ...safeUser,
+            published: houseData.publishedArr,
+            favorites: houseData.favoritesArr,
+            savedSearches: houseData.savedSearchesArr,
+          };
+
           // Add before sending response:
-          res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-          res.status(200).json(updatedUser);
+          res.set(
+            "Cache-Control",
+            "no-store, no-cache, must-revalidate, private"
+          );
+          res.status(200).json(user);
           // Update the user document in MongoDB with the new profile image URL
           // updateData.profilePicture = downloadUrl;
         } catch (err) {
@@ -896,6 +851,12 @@ router.put(
         const currentProfilePic = userFound.profilePicture;
 
         if (currentProfilePic !== DEFAULT_IMG_URL) {
+          // Find the current proxy mapping
+          // const proxyMapping = await ImageProxy.findOne({
+          //   userId: userId,
+          //   originalUrl: currentProfilePic,
+          // });
+
           let decodedPath = "";
 
           // URL contains '/o/' (standard Firebase Storage URL)
@@ -920,12 +881,23 @@ router.put(
           try {
             await file.delete();
             console.log(`Successfully deleted file`);
-            // Only update the profile picture after the file deletion succeeds
+
+            // Update the existing proxy mapping to point to the default image
+            // if (proxyMapping) {
+            //   await ImageProxy.findByIdAndUpdate(proxyMapping._id, {
+            //     originalUrl: DEFAULT_IMG_URL,
+            //     contentType: "image/jpeg",
+            //   });
+
+            //   // Keep using the same proxy URL
+            //   const proxyUrl = `${process.env.API_BASE_URL}/media/${proxyMapping.proxyId}`;
+
+            // Update user with the same proxy URL
             await User.updateOne(
               { _id: userId },
               {
                 ...body,
-                $set: { profilePicture: body.profilePicture },
+                $set: { profilePicture: DEFAULT_IMG_URL },
               }
             );
 
@@ -934,11 +906,24 @@ router.put(
               .populate("favorites")
               .populate("savedSearches");
 
-            // Add before sending response:
-            res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-            res.status(200).json(updatedUser);
+            const safeUser = await sanitizeUser(updatedUser);
+            const houseData = await populatedHouse(safeUser);
+
+            const user = {
+              ...safeUser,
+              published: houseData.publishedArr,
+              favorites: houseData.favoritesArr,
+              savedSearches: houseData.savedSearchesArr,
+            };
+
+            res.set(
+              "Cache-Control",
+              "no-store, no-cache, must-revalidate, private"
+            );
+            res.status(200).json(user);
+            // }
           } catch (err) {
-            console.error(`Failed to delete file :`, err);
+            console.error(`Failed to delete file:`, err);
             if (err.code === "storage/object-not-found") {
               return res
                 .status(404)
@@ -950,6 +935,7 @@ router.put(
           }
         }
       }
+
       // Update the user's profile with the new image URL
     } catch (err) {
       console.error("Error during file upload or Firebase handling:", err);
@@ -959,7 +945,7 @@ router.put(
 );
 
 router.delete("/delete", isAuthenticated, async (req, res) => {
-  // const userId = req.payload.data.user.userId;
+
   const userId = req.user;
 
   try {
@@ -977,43 +963,43 @@ router.delete("/delete", isAuthenticated, async (req, res) => {
       // ============================
       const currentProfilePic = userFound.profilePicture;
 
-        if (currentProfilePic !== DEFAULT_IMG_URL) {
-          let decodedPath = "";
+      if (currentProfilePic !== DEFAULT_IMG_URL) {
+        let decodedPath = "";
 
-          // URL contains '/o/' (standard Firebase Storage URL)
-          if (currentProfilePic.includes("/o/")) {
-            const urlParts = currentProfilePic.split("/o/")[1]; // Split and get the path after '/o/'
-            decodedPath = decodeURIComponent(urlParts.split("?")[0]); // Decode and remove query string
-          } else {
-            // If '/o/' is not present, assume the path is directly in the URL
-            const urlParts = currentProfilePic.split(".appspot.com/")[1]; // Get the path after '.appspot.com/'
-            decodedPath = decodeURIComponent(urlParts.split("?")[0]); // Decode and remove query string
-          }
-
-          // Validate the decoded path to ensure it looks like a valid Firebase Storage path
-          if (!decodedPath || !decodedPath.startsWith("profile_picture/")) {
-            console.error("Invalid Firebase Storage path:", decodedPath);
-            return res.status(400).json({ message: "Invalid file path." });
-          }
-
-          // Get the reference to the Firebase Storage file
-          const file = bucket.file(decodedPath);
-
-          try {
-            await file.delete();
-            console.log(`Successfully deleted file`);
-          } catch (err) {
-            console.error(`Failed to delete file :`, err);
-            if (err.code === "storage/object-not-found") {
-              return res
-                .status(404)
-                .json({ message: "File not found in Firebase Storage." });
-            }
-            return res
-              .status(500)
-              .json({ message: "Error deleting file from Firebase." });
-          }
+        // URL contains '/o/' (standard Firebase Storage URL)
+        if (currentProfilePic.includes("/o/")) {
+          const urlParts = currentProfilePic.split("/o/")[1]; // Split and get the path after '/o/'
+          decodedPath = decodeURIComponent(urlParts.split("?")[0]); // Decode and remove query string
+        } else {
+          // If '/o/' is not present, assume the path is directly in the URL
+          const urlParts = currentProfilePic.split(".appspot.com/")[1]; // Get the path after '.appspot.com/'
+          decodedPath = decodeURIComponent(urlParts.split("?")[0]); // Decode and remove query string
         }
+
+        // Validate the decoded path to ensure it looks like a valid Firebase Storage path
+        if (!decodedPath || !decodedPath.startsWith("profile_picture/")) {
+          console.error("Invalid Firebase Storage path:", decodedPath);
+          return res.status(400).json({ message: "Invalid file path." });
+        }
+
+        // Get the reference to the Firebase Storage file
+        const file = bucket.file(decodedPath);
+
+        try {
+          await file.delete();
+          console.log(`Successfully deleted file`);
+        } catch (err) {
+          console.error(`Failed to delete file :`, err);
+          if (err.code === "storage/object-not-found") {
+            return res
+              .status(404)
+              .json({ message: "File not found in Firebase Storage." });
+          }
+          return res
+            .status(500)
+            .json({ message: "Error deleting file from Firebase." });
+        }
+      }
 
       // Extract IDs of posted houses
       const postedHouses = userFound.published;
@@ -1081,7 +1067,7 @@ router.delete("/delete", isAuthenticated, async (req, res) => {
       await User.findByIdAndDelete(userId);
 
       // Add before sending response:
-      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
       res.status(200).json({ message: "User and associated data deleted" });
     } else {
       res.status(400).json({ message: "User ID not provided" });
