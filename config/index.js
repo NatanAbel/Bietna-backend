@@ -28,7 +28,8 @@ module.exports = (app) => {
       credentials:true,
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Cookie","Cache-Control","X-Requested-With"],
-    exposedHeaders: ["set-cookie"]
+    exposedHeaders: ["set-cookie"],
+    secure: process.env.NODE_ENV !== 'production'
     })
   );
 

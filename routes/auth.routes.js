@@ -285,16 +285,19 @@ router.post("/signup", async (req, res) => {
 //   }
 // });
 
-router.post("/login", loginLimiter, async (req, res) => {
+router.post("/login",loginLimiter, async (req, res) => {
   const body = req.body;
   try {
 
     // Add security headers
     res.set({
+      // X-Content-Type-Options: Prevent MIME type sniffing
       'X-Content-Type-Options': 'nosniff',
+      // X-Frame-Options: Prevent clickjacking
       'X-Frame-Options': 'DENY',
-      'X-XSS-Protection': '1; mode=block',
+      // Strict-Transport-Security: Enforce HTTPS security
       'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
+      // Cache-Control: Prevent caching of sensitive data
       'Cache-Control': 'no-store, no-cache, must-revalidate, private'
     });
 
@@ -336,7 +339,7 @@ router.post("/login", loginLimiter, async (req, res) => {
         res.cookie("token", refreshToken, {
           httpOnly: true,
           secure: true,
-          sameSite: "None", // Use "Lax" in dev
+          sameSite: "None",
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
