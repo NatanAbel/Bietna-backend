@@ -21,8 +21,15 @@ const asyncHandler = require("express-async-handler");
 const { bucket, auth, firestore } = require("../firebaseAdmin");
 const { multerErrorHandler } = require("../middleware/multerErrorHandler.js");
 const sanitize = require("sanitize-html");
-const { sanitizeImageUrl, sanitizeUser, populatedHouse } = require("../methods/sanitizeMethods.js");
-const { processImageUpload, validateFiles } = require("../methods/imageFileHandlers.js");
+const {
+  sanitizeImageUrl,
+  sanitizeUser,
+  populatedHouse,
+} = require("../methods/sanitizeMethods.js");
+const {
+  processImageUpload,
+  validateFiles,
+} = require("../methods/imageFileHandlers.js");
 
 const storage = multer.memoryStorage();
 const upload = multer({
@@ -65,9 +72,9 @@ const checkWithVirusTotal = async (fileBuffer) => {
 // Decode the house ID before querying
 const decodeId = (encodedId) => {
   if (!encodedId) return null;
-  
-  if (encodedId.startsWith('house_')) {
-    return Buffer.from(encodedId.replace('house_', ''), 'base64').toString();
+
+  if (encodedId.startsWith("house_")) {
+    return Buffer.from(encodedId.replace("house_", ""), "base64").toString();
   }
   return encodedId;
 };
@@ -285,31 +292,17 @@ router.post("/signup", async (req, res) => {
 //   }
 // });
 
-router.post("/login",loginLimiter, async (req, res) => {
+router.post("/login", loginLimiter, async (req, res) => {
   const body = req.body;
   try {
-
-    // Add security headers
-    res.set({
-      // X-Content-Type-Options: Prevent MIME type sniffing
-      'X-Content-Type-Options': 'nosniff',
-      // X-Frame-Options: Prevent clickjacking
-      'X-Frame-Options': 'DENY',
-      // Strict-Transport-Security: Enforce HTTPS security
-      'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
-      // Cache-Control: Prevent caching of sensitive data
-      'Cache-Control': 'no-store, no-cache, must-revalidate, private'
-    });
-
     //find if the user exists
     if (!body.userName || !body.password)
       return res.status(400).json({ message: "All fields are required!!" });
 
-    const user = await User.find({ userName: body.userName }).exec();
+    const user = await User.findOne({ userName: body.userName }).lean().exec();
 
-    if (user.length > 0) {
-
-      const currentUser = user[0];
+    if (user) {
+      const currentUser = user;
       const passwordCheck = bcrypt.compareSync(
         body.password,
         currentUser.password
@@ -338,12 +331,25 @@ router.post("/login",loginLimiter, async (req, res) => {
 
         res.cookie("token", refreshToken, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === 'production',
-          sameSite: process.env.NODE_ENV === 'production' ? "None" : "Lax",
+          secure: process.env.NODE_ENV === "production",
+          sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
+        // Security headers
+        res.set({
+          // X-Content-Type-Options: Prevent MIME type sniffing
+          "X-Content-Type-Options": "nosniff",
+          // X-Frame-Options: Prevent clickjacking
+          "X-Frame-Options": "DENY",
+          // Strict-Transport-Security: Enforce HTTPS security
+          "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+          // Cache-Control: Prevent caching of sensitive data
+          "Cache-Control": "no-store, no-cache, must-revalidate, private",
+        });
+
         res.json({ accessToken });
+        
       } else {
         res.status(401).json({ message: "Wrong username or password !" });
       }
@@ -406,8 +412,8 @@ router.get("/logout", (req, res) => {
   if (!cookies?.token) return res.sendStatus(204); // No content
   res.clearCookie("token", {
     httpOnly: "true",
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? "None" : "Lax",
+    secure: process.env.NODE_ENV === "production",
+    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
   });
 
   // Add before sending response:
@@ -461,8 +467,8 @@ router.post("/google", async (req, res, next) => {
       // res.status(200).json({ token });
       res.cookie("token", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? "None" : "Lax",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -527,8 +533,8 @@ router.post("/google", async (req, res, next) => {
       // res.status(200).json({ token });
       res.cookie("token", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: process.env.NODE_ENV === 'production' ? "None" : "Lax",
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -542,14 +548,13 @@ router.post("/google", async (req, res, next) => {
   }
 });
 
-
 router.get("/verify", isAuthenticated, async (req, res) => {
   // const userId = req.payload.data.user.userId;
   const userId = req.user;
 
   if (!userId) return res.status(401).json({ message: "Invalid user" });
   try {
-    const verifyUser = await User.findById(userId);
+    const verifyUser = await User.findById(userId).lean().exec();
 
     if (!verifyUser) {
       return res.status(404).json({ message: "User not found" });
@@ -559,14 +564,13 @@ router.get("/verify", isAuthenticated, async (req, res) => {
 
     // Add before sending response:
     res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
-    res.status(200).json({ verified : sanitizedUser });
+    res.status(200).json({ verified: sanitizedUser });
   } catch (err) {
     console.error(err);
   }
 });
 
 router.get("/profile", isAuthenticated, async (req, res) => {
-
   const userId = req.user;
 
   try {
@@ -575,9 +579,9 @@ router.get("/profile", isAuthenticated, async (req, res) => {
       .populate("favorites")
       .populate("savedSearches");
 
-      if (!userFound) {
-        return res.status(404).json({ message: "User not found" });
-      }
+    if (!userFound) {
+      return res.status(404).json({ message: "User not found" });
+    }
 
     // Sanitize user data before sending
     const safeUser = await sanitizeUser(userFound);
@@ -806,7 +810,6 @@ router.put(
             }
           );
 
-
           // Get the sanitized URL before sending response
           const sanitizedUrl = await sanitizeImageUrl(downloadUrl, userId);
 
@@ -821,7 +824,7 @@ router.put(
           // Create response with the new sanitized URL
           const safeUser = await sanitizeUser({
             ...updatedUser.toObject(),
-            profilePicture: sanitizedUrl // Use the sanitized URL directly
+            profilePicture: sanitizedUrl, // Use the sanitized URL directly
           });
 
           // Get populated house data
@@ -948,7 +951,6 @@ router.put(
 );
 
 router.delete("/delete", isAuthenticated, async (req, res) => {
-
   const userId = req.user;
 
   try {
