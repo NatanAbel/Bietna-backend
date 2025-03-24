@@ -338,8 +338,8 @@ router.post("/login",loginLimiter, async (req, res) => {
 
         res.cookie("token", refreshToken, {
           httpOnly: true,
-          secure: true,
-          sameSite: "None",
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: process.env.NODE_ENV === 'production' ? "None" : "Lax",
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
@@ -406,8 +406,8 @@ router.get("/logout", (req, res) => {
   if (!cookies?.token) return res.sendStatus(204); // No content
   res.clearCookie("token", {
     httpOnly: "true",
-    sameSite: "None", // Use "Lax" in dev,
-    secure: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? "None" : "Lax",
   });
 
   // Add before sending response:
@@ -461,8 +461,8 @@ router.post("/google", async (req, res, next) => {
       // res.status(200).json({ token });
       res.cookie("token", refreshToken, {
         httpOnly: true,
-        secure: true,
-        sameSite: "None", // Use "Lax" in dev
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? "None" : "Lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -527,8 +527,8 @@ router.post("/google", async (req, res, next) => {
       // res.status(200).json({ token });
       res.cookie("token", refreshToken, {
         httpOnly: true,
-        secure: true,
-        sameSite: "None", // Use "Lax" in dev
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? "None" : "Lax",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 

@@ -11,9 +11,6 @@ const express = require("express");
 
 const app = express();
 
-// ℹ️ This function is getting exported from the config folder. It runs most pieces of middleware
-require("./config")(app);
-
 // HTTPS redirect middleware for production
 if (process.env.NODE_ENV === 'production') {
     app.use((req, res, next) => {
@@ -24,6 +21,11 @@ if (process.env.NODE_ENV === 'production') {
       }
     });
   }
+
+  
+// ℹ️ This function is getting exported from the config folder. It runs most pieces of middleware
+require("./config")(app);
+
 
 // 👇 Start handling routes here
 const indexRoutes = require("./routes/index.routes");

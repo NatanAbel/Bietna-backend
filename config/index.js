@@ -29,7 +29,7 @@ module.exports = (app) => {
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "Cookie","Cache-Control","X-Requested-With"],
     exposedHeaders: ["set-cookie"],
-    secure: process.env.NODE_ENV !== 'production'
+    secure: process.env.NODE_ENV === 'production'
     })
   );
 
