@@ -7,13 +7,15 @@ const userSchema = new Schema(
       required: [true, 'User name is required.'],
       unique: true,
       lowercase: true,
-      trim: true
+      trim: true,
+      index: true
     },
     email: {
       type: String,
       required:[true, 'email is required.'],
       lowercase: true,
       unique: true,
+      index: true,
       validate: {
         validator: async function (value) {
           // Basic email regex for structure validation

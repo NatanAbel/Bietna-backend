@@ -299,7 +299,7 @@ router.post("/login", loginLimiter, async (req, res) => {
     if (!body.userName || !body.password)
       return res.status(400).json({ message: "All fields are required!!" });
 
-    const user = await User.findOne({ userName: body.userName }).lean().exec();
+    const user = await User.findOne({ userName: body.userName }).select('password role _id').lean().exec();
 
     if (user) {
       const currentUser = user;
@@ -307,7 +307,9 @@ router.post("/login", loginLimiter, async (req, res) => {
         body.password,
         currentUser.password
       );
+      // Check if the password is correct
       if (passwordCheck) {
+
         const accessToken = jwt.sign(
           {
             data: {
