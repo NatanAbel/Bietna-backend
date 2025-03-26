@@ -25,15 +25,23 @@ module.exports = (app) => {
   app.use(
     cors({
       origin: [FRONTEND_URL],
-      credentials:true,
+      credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Cookie","Cache-Control","X-Requested-With"],
-    exposedHeaders: ["set-cookie"],
-    secure: process.env.NODE_ENV === 'production'
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "Cookie",
+        "Cache-Control",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+      ],
+      exposedHeaders: ["set-cookie"],
+      secure: process.env.NODE_ENV === "production",
     })
   );
 
-  app.use(express.static('public'))
+  app.use(express.static("public"));
 
   // In development environment the app logs
   app.use(logger("dev"));
