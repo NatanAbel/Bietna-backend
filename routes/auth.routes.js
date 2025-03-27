@@ -333,8 +333,8 @@ router.post("/login", loginLimiter, async (req, res) => {
 
         res.cookie("token", refreshToken, {
           httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+          secure: true,
+          sameSite: "None",
           path: '/',
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
@@ -366,6 +366,12 @@ router.post("/login", loginLimiter, async (req, res) => {
 });
 
 router.get("/refresh", async (req, res) => {
+
+  if (process.env.NODE_ENV === 'development') {
+    console.log('Cookies received:', req.cookies);
+    console.log('Headers:', req.headers);
+  }
+
   const cookies = req.cookies;
   if (!cookies?.token) return res.status(401).json({ message: "unauthorized" });
   const refreshToken = cookies.token;
@@ -471,8 +477,8 @@ router.post("/google", async (req, res, next) => {
       // res.status(200).json({ token });
       res.cookie("token", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+        secure: true,
+        sameSite: "None",
         path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
@@ -538,8 +544,8 @@ router.post("/google", async (req, res, next) => {
       // res.status(200).json({ token });
       res.cookie("token", refreshToken, {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+        secure: true,
+        sameSite: "None",
         path: '/',
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
