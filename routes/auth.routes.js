@@ -410,19 +410,13 @@ router.get("/refresh", async (req, res) => {
 });
 
 router.get("/logout", (req, res) => {
-  // res
-  //   .cookie("token", "", {
-  //     httpOnly: true,
-  //     expires: new Date(0),
-  //   })
-  //   // .send();
-  // res.status(200).json({message: "user logged out"})
+  
   const cookies = req.cookies;
   if (!cookies?.token) return res.sendStatus(204); // No content
   res.clearCookie("token", {
     httpOnly: "true",
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+    secure: true,
+    sameSite: "None",
     path: '/',
   });
 
