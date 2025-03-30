@@ -337,7 +337,6 @@ router.post("/login", loginLimiter, async (req, res) => {
           sameSite: "None",
           path: '/',
           maxAge: 7 * 24 * 60 * 60 * 1000,
-          domain: process.env.NODE_ENV === "production" ? process.env.COOKIE_DOMAIN : undefined
         });
 
         // Security headers
@@ -398,11 +397,10 @@ router.get("/refresh", async (req, res) => {
         );
 
         // Add inside the jwt.verify callback before sending response:
-        res.set({
-          "Cache-Control": "no-store, no-cache, must-revalidate, private",
-          "Access-Control-Allow-Credentials": "true",
-        });
-        
+        res.set(
+          "Cache-Control",
+          "no-store, no-cache, must-revalidate, private"
+        );
         res.json({ accessToken });
       })
     );
@@ -412,7 +410,6 @@ router.get("/refresh", async (req, res) => {
 });
 
 router.get("/logout", (req, res) => {
-  
   const cookies = req.cookies;
   if (!cookies?.token) return res.sendStatus(204); // No content
   res.clearCookie("token", {

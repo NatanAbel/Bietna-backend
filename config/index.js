@@ -22,31 +22,24 @@ module.exports = (app) => {
   app.set("trust proxy", 1);
 
   // controls a very specific header to pass headers from the frontend
-  const corsOptions = {
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps)
-      if (!origin || FRONTEND_URL.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: [
-      "Content-Type",
-      "Authorization",
-      "Cookie",
-      "Cache-Control",
-      "X-Requested-With",
-      "Accept",
-      "Origin",
-    ],
-    exposedHeaders: ["set-cookie"],
-    secure: process.env.NODE_ENV === "production"
-  };
-
-  app.use(cors(corsOptions));
+  app.use(
+    cors({
+      origin: [FRONTEND_URL],
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: [
+        "Content-Type",
+        "Authorization",
+        "Cookie",
+        "Cache-Control",
+        "X-Requested-With",
+        "Accept",
+        "Origin",
+      ],
+      exposedHeaders: ["set-cookie"],
+      secure: process.env.NODE_ENV === "production",
+    })
+  );
 
   app.use(express.static("public"));
 
