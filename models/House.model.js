@@ -65,7 +65,6 @@ const houseSchema = new Schema(
     },
     images: {
       type: [String],
-      // required: [true, "Images are required"],
       required: true,
       validate: {
         validator: function(v) {

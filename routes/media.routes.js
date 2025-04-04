@@ -67,7 +67,11 @@ router.get("/:proxyId", async (req, res) => {
     
     // Set appropriate headers
     res.set("Content-Type", proxyMapping.contentType);
-    res.set("Cache-Control", "public, max-age=86400"); // Cache for 1 day
+    res.set({
+      'Cache-Control': 'public, max-age=86400',
+      'ETag': true,
+      'Vary': 'Accept-Encoding'
+    }); // Cache for 1 day
     
     // Stream the file to the response
     const readStream = file.createReadStream();

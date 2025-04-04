@@ -12,7 +12,11 @@ const { bucket } = require("../firebaseAdmin");
 const sharp = require("sharp"); //Sharp is a high-performance Node.js image processing library that supports image compression and resizing.
 const { v4: uuidv4 } = require("uuid");
 const sanitize = require("sanitize-html");
-const { gallaryImageUpload, gallaryValidateFiles, sanitizeHouseResponse } = require("../methods/gallaryFileHandler.js");
+const {
+  gallaryImageUpload,
+  gallaryValidateFiles,
+  sanitizeHouseResponse,
+} = require("../methods/gallaryFileHandler.js");
 // Multer is used to parse data multipart/form-data request body and handle file uploads
 // memoryStorage(): Stores files temporarily in the server's RAM (memory)
 const storage = multer.memoryStorage();
@@ -46,14 +50,14 @@ const giveCurrentDateTime = () => {
   const time =
     today.getHours() + ":" + today.getMinutes() + ":" + today.getSeconds();
   return `${date} ${time}`;
-}
+};
 
 // Decode the house ID before querying
 const decodeId = (encodedId) => {
   if (!encodedId) return null;
-  
-  if (encodedId.startsWith('house_')) {
-    return Buffer.from(encodedId.replace('house_', ''), 'base64').toString();
+
+  if (encodedId.startsWith("house_")) {
+    return Buffer.from(encodedId.replace("house_", ""), "base64").toString();
   }
   return encodedId;
 };
@@ -76,16 +80,22 @@ router.get("/", async (req, res) => {
 
     // const paginatedHouses = houses.slice(startIndex, startIndex + limit);
 
-    const paginatedHouses = await House.find({})
-  .skip(startIndex)
-  .limit(limit);
+    
+    // "latitude",
+    // "longitude",
 
-    const uniqueAreas = [...new Set(paginatedHouses.map((house) => house.address))];
-    const uniqueCities = [...new Set(paginatedHouses.map((house) => house.city))];
+    const paginatedHouses = await House.find({}).select('address images availability price rentalPrice bedrooms bathrooms city homeType features country sqm yearBuilt postedBy latitude longitude').skip(startIndex).limit(limit).lean();
+
+    const uniqueAreas = [
+      ...new Set(paginatedHouses.map((house) => house.address)),
+    ];
+    const uniqueCities = [
+      ...new Set(paginatedHouses.map((house) => house.city)),
+    ];
 
     // Use Promise.all since sanitizeHouseResponse is async
     const sanitizedHouses = await Promise.all(
-      paginatedHouses.map(house => sanitizeHouseResponse(house))
+      paginatedHouses.map((house) => sanitizeHouseResponse(house))
     );
 
     const results = {
@@ -109,8 +119,8 @@ router.get("/", async (req, res) => {
         page: page - 1,
       };
     }
-     // Add cache headers
-     res.set('Cache-Control', 'public, max-age=300');
+    // Add cache headers
+    res.set("Cache-Control", "public, max-age=300");
     res.status(200).json(results);
   } catch (err) {
     console.error(err);
@@ -130,7 +140,7 @@ router.get("/:houseId", async (req, res) => {
     const sanitizedHouse = await sanitizeHouseResponse(house);
 
     // Add cache headers
-    res.set('Cache-Control', 'public, max-age=300');
+    res.set("Cache-Control", "public, max-age=300");
     res.status(200).json(sanitizedHouse);
   } catch (err) {
     console.error(err);
@@ -279,8 +289,8 @@ router.post(
       });
 
       const findHouse = await House.findById(newHouse._id).populate("postedBy");
-       // Add before sending response:
-      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      // Add before sending response:
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
       res.status(201).json(findHouse);
     } catch (err) {
       console.error(err);
@@ -381,11 +391,9 @@ router.put(
         const totalImagesAfterUpdate = house.images.length + req.files.length;
 
         if (totalImagesAfterUpdate > 10) {
-          return res
-            .status(413)
-            .json({
-              message: `Maximum of 10 images allowed. You currently have ${house.images.length} images.`,
-            });
+          return res.status(413).json({
+            message: `Maximum of 10 images allowed. You currently have ${house.images.length} images.`,
+          });
         }
 
         const dateTime = giveCurrentDateTime();
@@ -425,7 +433,7 @@ router.put(
       const sanitizedHouse = await sanitizeHouseResponse(updateHouse);
 
       // Add before sending response:
-      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+      res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
       res.status(200).json(sanitizedHouse);
     } catch (err) {
       console.error("Error updating house:", err);
@@ -481,7 +489,7 @@ router.delete("/:houseId/image", isAuthenticated, async (req, res) => {
     await house.save();
 
     // Add before sending response:
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
     res.status(200).json({ message: "Image deleted successfully" });
   } catch (error) {
     console.error("Error deleting image:", error);
@@ -515,13 +523,13 @@ router.get("/search/result", async (req, res) => {
 
     // Sanitize and whitelist input
     const sanitizedQuery = {};
-    
+
     allowedFields.forEach((field) => {
       if (req.query[field]) {
         // Handle arrays (like houseType and features) differently
         if (Array.isArray(req.query[field])) {
           // Sanitize each array element individually
-          sanitizedQuery[field] = req.query[field].map(item => 
+          sanitizedQuery[field] = req.query[field].map((item) =>
             sanitize(item, {
               allowedTags: [],
               allowedAttributes: {},
@@ -622,18 +630,22 @@ router.get("/search/result", async (req, res) => {
       query.city = query.city || {};
       query.city.$regex = new RegExp(city, "i");
     }
-    
+
     if (country) {
       query.country = query.country || {};
       query.country.$regex = new RegExp(country, "i");
     }
-    
+
     if (houseType) {
-      query.homeType = { $in: Array.isArray(houseType) ? houseType : [houseType] };
+      query.homeType = {
+        $in: Array.isArray(houseType) ? houseType : [houseType],
+      };
     }
-    
+
     if (features) {
-      query.features = { $all: Array.isArray(features) ? features : [features] };
+      query.features = {
+        $all: Array.isArray(features) ? features : [features],
+      };
     }
 
     // Get all matching houses
@@ -674,7 +686,7 @@ router.get("/search/result", async (req, res) => {
     const paginatedHouses = allHouses.slice(startIndex, startIndex + limit);
 
     const sanitizedResults = await Promise.all(
-      paginatedHouses.map(house => sanitizeHouseResponse(house))
+      paginatedHouses.map((house) => sanitizeHouseResponse(house))
     );
 
     const results = {
@@ -697,8 +709,8 @@ router.get("/search/result", async (req, res) => {
       };
     }
 
-      // Add before sending response:
-    res.set('Cache-Control', 'public, max-age=300'); // 5 minutes
+    // Add before sending response:
+    res.set("Cache-Control", "public, max-age=300"); // 5 minutes
     res.status(200).json(results);
   } catch (error) {
     console.error(error);
@@ -711,7 +723,11 @@ router.get("/homeTypes/enumValues", async (req, res) => {
   try {
     const enumValues = House.schema.path("homeType").options.enum;
     // Cache longer for static data
-    res.set('Cache-Control', 'public, max-age=86400'); // 24 hours
+    res.set({
+      "Cache-Control": "public, max-age=86400",
+      "ETag": true,
+      "Vary": "Accept-Encoding",
+    }); // 24 hours
     res.status(200).json(enumValues);
   } catch (err) {
     console.error(err);
@@ -725,7 +741,11 @@ router.get("/enumValues/features", async (req, res) => {
   try {
     const enumValues = House.schema.path("features").options.enum;
     // Cache longer for static data
-    res.set('Cache-Control', 'public, max-age=86400'); // 24 hours
+    res.set({
+      "Cache-Control": "public, max-age=86400",
+      "ETag": true,
+      "Vary": "Accept-Encoding",
+    }); // 24 hours
     res.status(200).json(enumValues);
   } catch (err) {
     console.error(err);
@@ -742,7 +762,6 @@ router.delete("/:houseId/delete", isAuthenticated, async (req, res) => {
   const userId = req.user;
 
   try {
-
     // Decode the house ID before querying
     const decodedHouseId = decodeId(houseId);
 
@@ -798,7 +817,7 @@ router.delete("/:houseId/delete", isAuthenticated, async (req, res) => {
 
     const deleteHouse = await House.findByIdAndDelete(decodedHouseId);
     // Add before sending response:
-    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    res.set("Cache-Control", "no-store, no-cache, must-revalidate, private");
     res.status(204).json({ message: "House deleted", deleteHouse });
   } catch (err) {
     console.error(err);

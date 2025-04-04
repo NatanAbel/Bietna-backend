@@ -559,7 +559,7 @@ router.get("/verify", isAuthenticated, async (req, res) => {
 
   if (!userId) return res.status(401).json({ message: "Invalid user" });
   try {
-    const verifyUser = await User.findById(userId).lean().exec();
+    const verifyUser = await User.findById(userId).select('userName email role profilePicture').lean().exec();
 
     if (!verifyUser) {
       return res.status(404).json({ message: "User not found" });
