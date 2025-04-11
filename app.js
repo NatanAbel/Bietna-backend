@@ -8,8 +8,22 @@ require("./db");
 // Handles http requests (express is node js framework)
 // https://www.npmjs.com/package/express
 const express = require("express");
+const compression = require('compression'); 
 
 const app = express();
+
+// Add compression middleware BEFORE HTTPS redirect and other middleware
+app.use(compression({
+  level: 6, // Compression level (0-9)
+  threshold: 1024, // Only compress responses larger than 1KB
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  }
+}));
+
 
 // HTTPS redirect middleware for production
 if (process.env.NODE_ENV === 'production') {

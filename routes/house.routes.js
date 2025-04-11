@@ -79,11 +79,7 @@ router.get("/", async (req, res) => {
     // const houses = await House.find({});
 
     // const paginatedHouses = houses.slice(startIndex, startIndex + limit);
-
     
-    // "latitude",
-    // "longitude",
-
     const paginatedHouses = await House.find({}).select('address images availability price rentalPrice bedrooms bathrooms city homeType features country sqm yearBuilt postedBy latitude longitude').skip(startIndex).limit(limit).lean();
 
     const uniqueAreas = [
