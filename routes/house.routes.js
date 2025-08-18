@@ -80,7 +80,7 @@ router.get("/", async (req, res) => {
 
     // const paginatedHouses = houses.slice(startIndex, startIndex + limit);
     
-    const paginatedHouses = await House.find({}).select('address images availability price rentalPrice bedrooms bathrooms city homeType features country sqm yearBuilt postedBy latitude longitude').skip(startIndex).limit(limit).lean();
+    const paginatedHouses = await House.find({}).select('address images availability price rentalPrice city homeType country sqm bedrooms bathrooms yearBuilt').skip(startIndex).limit(limit).lean().hint({ createdAt: -1 });;
 
     const uniqueAreas = [
       ...new Set(paginatedHouses.map((house) => house.address)),
@@ -644,10 +644,28 @@ router.get("/search/result", async (req, res) => {
       };
     }
 
-    // Get all matching houses
-    const allHouses = await House.find(query);
+    const responseResults = await House.aggregate([
+      { $match: query },
+      {
+        $facet: {
+          houses: [
+            { $skip: startIndex }, 
+            { $limit: limit },
+            { $project: { 
+              address: 1, images: 1, availability: 1, price: 1, 
+              rentalPrice: 1, bedrooms: 1, bathrooms: 1, city: 1, 
+              homeType: 1, features: 1, country: 1, sqm: 1, 
+              yearBuilt: 1, postedBy: 1, latitude: 1, longitude: 1 
+            }}
+          ],
+          totalCount: [{ $count: "count" }],
+          uniqueAreas: [{ $group: { _id: "$address" } }],
+          uniqueCities: [{ $group: { _id: "$city" } }]
+        }
+      }
+    ]);
 
-    const totalHouses = allHouses.length;
+    const totalHouses = responseResults[0].totalCount[0]?.count || 0;
 
     // Check if no houses are found and return a 'no results' message
     if (totalHouses === 0) {
@@ -657,29 +675,9 @@ router.get("/search/result", async (req, res) => {
       });
     }
 
-    // Extract unique areas and cities to display on the area and city dropdown filters respectively.
-    const houses = await House.find({});
-
-    let uniqueAreas;
-    let uniqueCities;
-
-    if (forRent === "true" || forSale === "true") {
-      const filteredHouses = houses.filter((house) => {
-        if (forRent === "true") {
-          return house.availability.forRent;
-        } else if (forSale === "true") {
-          return house.availability.forSale;
-        }
-      });
-
-      uniqueAreas = [...new Set(filteredHouses.map((house) => house.address))];
-      uniqueCities = [...new Set(filteredHouses.map((house) => house.city))];
-    } else {
-      uniqueAreas = [...new Set(houses.map((house) => house.address))];
-      uniqueCities = [...new Set(houses.map((house) => house.city))];
-    }
-
-    const paginatedHouses = allHouses.slice(startIndex, startIndex + limit);
+    const paginatedHouses = responseResults[0].houses;
+    const uniqueAreas = responseResults[0].uniqueAreas.map(item => item._id);
+    const uniqueCities = responseResults[0].uniqueCities.map(item => item._id);
 
     const sanitizedResults = await Promise.all(
       paginatedHouses.map((house) => sanitizeHouseResponse(house))

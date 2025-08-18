@@ -6,7 +6,7 @@ const houseSchema = new Schema(
       type: String,
       required: true,
       maxLength: 200,
-      trim: true
+      trim: true,
     },
     price: {
       type: Number,
@@ -67,10 +67,10 @@ const houseSchema = new Schema(
       type: [String],
       required: true,
       validate: {
-        validator: function(v) {
+        validator: function (v) {
           return v.length > 0 && v.length <= 20; // Max 20 images
-        }
-      }
+        },
+      },
     },
     latitude: {
       type: Number,
@@ -112,6 +112,50 @@ const houseSchema = new Schema(
     timestamps: true,
   }
 );
+
+// Add database indexes for query optimization
+// Single field indexes for basic queries
+houseSchema.index({ address: 1 });
+houseSchema.index({ city: 1 });
+houseSchema.index({ country: 1 });
+houseSchema.index({ "availability.forRent": 1 });
+houseSchema.index({ "availability.forSale": 1 });
+houseSchema.index({ price: 1 });
+houseSchema.index({ rentalPrice: 1 });
+houseSchema.index({ bedrooms: 1 });
+houseSchema.index({ bathrooms: 1 });
+houseSchema.index({ sqm: 1 });
+houseSchema.index({ homeType: 1 });
+houseSchema.index({ features: 1 });
+houseSchema.index({ postedBy: 1 });
+houseSchema.index({ yearBuilt: 1 });
+houseSchema.index({ latitude: 1, longitude: 1 });
+
+// Compound indexes for common query patterns
+houseSchema.index({ "availability.forRent": 1, rentalPrice: 1 });
+houseSchema.index({ "availability.forSale": 1, price: 1 });
+houseSchema.index({ city: 1, "availability.forRent": 1 });
+houseSchema.index({ city: 1, "availability.forSale": 1 });
+houseSchema.index({ country: 1, "availability.forRent": 1 });
+houseSchema.index({ country: 1, "availability.forSale": 1 });
+houseSchema.index({ bedrooms: 1, "availability.forRent": 1 });
+houseSchema.index({ bedrooms: 1, "availability.forSale": 1 });
+houseSchema.index({ sqm: 1, "availability.forRent": 1 });
+houseSchema.index({ sqm: 1, "availability.forSale": 1 });
+houseSchema.index({ yearBuilt: 1, "availability.forRent": 1 });
+houseSchema.index({ yearBuilt: 1, "availability.forSale": 1 });
+houseSchema.index({ homeType: 1, "availability.forRent": 1 });
+houseSchema.index({ homeType: 1, "availability.forSale": 1 });
+houseSchema.index({ features: 1, "availability.forRent": 1 });
+houseSchema.index({ features: 1, "availability.forSale": 1 });
+
+// Text search indexes for regex queries
+houseSchema.index({ address: "text" });
+houseSchema.index({ city: "text" });
+houseSchema.index({ country: "text" });
+
+// Index for pagination and sorting
+houseSchema.index({ createdAt: -1 });
 
 const House = model("House", houseSchema);
 
