@@ -334,14 +334,12 @@ router.post("/login", loginLimiter, async (req, res) => {
         );
 
         const isProd = process.env.NODE_ENV === "production";
-        const cookieDomain = isProd ? process.env.COOKIE_DOMAIN : undefined;
 
         res.cookie("token", refreshToken, {
           httpOnly: true,
           secure: isProd,
           sameSite: isProd ? "none" : "lax",
           path: "/",
-          domain: cookieDomain,
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
@@ -417,12 +415,10 @@ router.get("/logout", (req, res) => {
   const cookies = req.cookies;
   if (!cookies?.token) return res.sendStatus(204); // No content
   const isProd = process.env.NODE_ENV === "production";
-  const cookieDomain = isProd ? process.env.COOKIE_DOMAIN : undefined;
   res.clearCookie("token", {
     httpOnly: "true",
-    secure: true,
-    sameSite: "None",
-    domain:cookieDomain,
+    secure: isProd,
+    sameSite: isProd ? "none" : "lax",
     path: "/",
   });
 
