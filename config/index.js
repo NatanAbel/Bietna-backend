@@ -30,14 +30,10 @@ module.exports = (app) => {
       allowedHeaders: [
         "Content-Type",
         "Authorization",
-        "Cookie",
         "Cache-Control",
         "X-Requested-With",
         "Accept",
-        "Origin",
       ],
-      exposedHeaders: ["set-cookie"],
-      secure: process.env.NODE_ENV === "production",
     })
   );
 

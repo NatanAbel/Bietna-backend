@@ -299,7 +299,10 @@ router.post("/login", loginLimiter, async (req, res) => {
     if (!body.userName || !body.password)
       return res.status(400).json({ message: "All fields are required!!" });
 
-    const user = await User.findOne({ userName: body.userName }).select('password role _id').lean().exec();
+    const user = await User.findOne({ userName: body.userName })
+      .select("password role _id")
+      .lean()
+      .exec();
 
     if (user) {
       const currentUser = user;
@@ -309,7 +312,6 @@ router.post("/login", loginLimiter, async (req, res) => {
       );
       // Check if the password is correct
       if (passwordCheck) {
-
         const accessToken = jwt.sign(
           {
             data: {
@@ -331,11 +333,15 @@ router.post("/login", loginLimiter, async (req, res) => {
           { expiresIn: "1d" }
         );
 
+        const isProd = process.env.NODE_ENV === "production";
+        const cookieDomain = isProd ? process.env.COOKIE_DOMAIN : undefined;
+
         res.cookie("token", refreshToken, {
           httpOnly: true,
-          secure:  process.env.NODE_ENV === "production",
-          sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
-          path: '/',
+          secure: isProd,
+          sameSite: isProd ? "none" : "lax",
+          path: "/",
+          domain: cookieDomain,
           maxAge: 7 * 24 * 60 * 60 * 1000,
         });
 
@@ -352,7 +358,6 @@ router.post("/login", loginLimiter, async (req, res) => {
         });
 
         res.json({ accessToken });
-        
       } else {
         res.status(401).json({ message: "Wrong username or password !" });
       }
@@ -366,10 +371,9 @@ router.post("/login", loginLimiter, async (req, res) => {
 });
 
 router.get("/refresh", async (req, res) => {
-
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Cookies received:', req.cookies);
-    console.log('Headers:', req.headers);
+  if (process.env.NODE_ENV === "development") {
+    console.log("Cookies received:", req.cookies);
+    console.log("Headers:", req.headers);
   }
 
   const cookies = req.cookies;
@@ -412,11 +416,14 @@ router.get("/refresh", async (req, res) => {
 router.get("/logout", (req, res) => {
   const cookies = req.cookies;
   if (!cookies?.token) return res.sendStatus(204); // No content
+  const isProd = process.env.NODE_ENV === "production";
+  const cookieDomain = isProd ? process.env.COOKIE_DOMAIN : undefined;
   res.clearCookie("token", {
     httpOnly: "true",
     secure: true,
     sameSite: "None",
-    path: '/',
+    domain:cookieDomain,
+    path: "/",
   });
 
   // Add before sending response:
@@ -472,7 +479,7 @@ router.post("/google", async (req, res, next) => {
         httpOnly: true,
         secure: true,
         sameSite: "None",
-        path: '/',
+        path: "/",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -539,7 +546,7 @@ router.post("/google", async (req, res, next) => {
         httpOnly: true,
         secure: true,
         sameSite: "None",
-        path: '/',
+        path: "/",
         maxAge: 7 * 24 * 60 * 60 * 1000,
       });
 
@@ -559,7 +566,10 @@ router.get("/verify", isAuthenticated, async (req, res) => {
 
   if (!userId) return res.status(401).json({ message: "Invalid user" });
   try {
-    const verifyUser = await User.findById(userId).select('userName email role profilePicture').lean().exec();
+    const verifyUser = await User.findById(userId)
+      .select("userName email role profilePicture")
+      .lean()
+      .exec();
 
     if (!verifyUser) {
       return res.status(404).json({ message: "User not found" });
