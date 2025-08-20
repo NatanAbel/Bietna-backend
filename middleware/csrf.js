@@ -9,7 +9,10 @@ exports.ensureCsrfCookie = (req, res, next) => {
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
       path: '/',
+      // Allow both frontend.onrender.com and backend-api.onrender.com to read it
+      ...(isProd ? { domain: '.onrender.com' } : {}),
     });
+    res.cookie('XSRF-TOKEN', token, opts);
   }
   next();
 };
