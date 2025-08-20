@@ -33,6 +33,7 @@ module.exports = (app) => {
         "Cache-Control",
         "X-Requested-With",
         "Accept",
+        "X-XSRF-TOKEN",
       ],
     })
   );
@@ -40,7 +41,7 @@ module.exports = (app) => {
   app.use(express.static("public"));
 
   // In development environment the app logs
-  app.use(logger("dev"));
+  app.use(logger(process.env.NODE_ENV === "production" ? "combined" : "dev"));
 
   // To have access to `body` property in the request
   app.use(express.json());

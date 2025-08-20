@@ -17,6 +17,7 @@ const {
   gallaryValidateFiles,
   sanitizeHouseResponse,
 } = require("../methods/gallaryFileHandler.js");
+const { csrf } = require("../middleware/csrf");
 // Multer is used to parse data multipart/form-data request body and handle file uploads
 // memoryStorage(): Stores files temporarily in the server's RAM (memory)
 const storage = multer.memoryStorage();
@@ -146,6 +147,7 @@ router.get("/:houseId", async (req, res) => {
 // Creating a new house
 router.post(
   "/new",
+  csrf,
   isAuthenticated,
   updateLimiter,
   upload.array("image", 10),
@@ -298,6 +300,7 @@ router.post(
 // Updating existing house
 router.put(
   "/:houseId/update",
+  csrf,
   isAuthenticated,
   updateLimiter,
   upload.array("image", 10),
@@ -439,7 +442,7 @@ router.put(
 );
 
 // Deleting a house image
-router.delete("/:houseId/image", isAuthenticated, async (req, res) => {
+router.delete("/:houseId/image", csrf, isAuthenticated, async (req, res) => {
   try {
     const { houseId } = req.params;
     const { imageUrl } = req.body;
@@ -750,7 +753,7 @@ router.get("/enumValues/features", async (req, res) => {
 });
 
 // Delete a house
-router.delete("/:houseId/delete", isAuthenticated, async (req, res) => {
+router.delete("/:houseId/delete", csrf, isAuthenticated, async (req, res) => {
   const { houseId } = req.params;
   // const userId = req.payload.data.user.userId;
   const userId = req.user;

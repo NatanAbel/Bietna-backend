@@ -21,6 +21,7 @@ const asyncHandler = require("express-async-handler");
 const { bucket, auth, firestore } = require("../firebaseAdmin");
 const { multerErrorHandler } = require("../middleware/multerErrorHandler.js");
 const sanitize = require("sanitize-html");
+const { csrf } = require("../middleware/csrf");
 const {
   sanitizeImageUrl,
   sanitizeUser,
@@ -41,6 +42,8 @@ const upload = multer({
 
 // Default image url
 const DEFAULT_IMG_URL = process.env.PROFILE_DEFAULT_IMG_URL;
+const isProd = process.env.NODE_ENV === 'production';
+const COOKIE_NAME = isProd ? '__Host-refresh' : 'refresh';
 
 const giveCurrentDateTime = () => {
   const today = new Date();
@@ -161,7 +164,7 @@ const decodeId = (encodedId) => {
 //   }
 // });
 
-router.post("/signup", async (req, res) => {
+router.post("/signup", csrf, async (req, res) => {
   const { userName, email, password, firstName, lastName } = req.body;
 
   try {
@@ -292,7 +295,7 @@ router.post("/signup", async (req, res) => {
 //   }
 // });
 
-router.post("/login", loginLimiter, async (req, res) => {
+router.post("/login", csrf, loginLimiter, async (req, res) => {
   const body = req.body;
   try {
     //find if the user exists
@@ -306,7 +309,7 @@ router.post("/login", loginLimiter, async (req, res) => {
 
     if (user) {
       const currentUser = user;
-      const passwordCheck = bcrypt.compareSync(
+      const passwordCheck = await bcrypt.compareSync(
         body.password,
         currentUser.password
       );
@@ -333,14 +336,13 @@ router.post("/login", loginLimiter, async (req, res) => {
           { expiresIn: "1d" }
         );
 
-        const isProd = process.env.NODE_ENV === "production";
 
-        res.cookie("token", refreshToken, {
+        res.cookie(COOKIE_NAME, refreshToken, {
           httpOnly: true,
           secure: isProd,
           sameSite: isProd ? "none" : "lax",
           path: "/",
-          maxAge: 7 * 24 * 60 * 60 * 1000,
+          maxAge: 24 * 60 * 60 * 1000,
         });
 
         // Security headers
@@ -368,15 +370,18 @@ router.post("/login", loginLimiter, async (req, res) => {
   }
 });
 
-router.get("/refresh", async (req, res) => {
+router.post("/refresh", csrf, async (req, res) => {
+
   if (process.env.NODE_ENV === "development") {
     console.log("Cookies received:", req.cookies);
     console.log("Headers:", req.headers);
   }
 
   const cookies = req.cookies;
-  if (!cookies?.token) return res.status(401).json({ message: "unauthorized" });
-  const refreshToken = cookies.token;
+  const refreshToken = cookies[COOKIE_NAME];
+
+  if (!refreshToken) return res.status(401).json({ message: "unauthorized" });
+
   try {
     jwt.verify(
       refreshToken,
@@ -413,9 +418,8 @@ router.get("/refresh", async (req, res) => {
 
 router.get("/logout", (req, res) => {
   const cookies = req.cookies;
-  if (!cookies?.token) return res.sendStatus(204); // No content
-  const isProd = process.env.NODE_ENV === "production";
-  res.clearCookie("token", {
+  if (!cookies?.[COOKIE_NAME]) return res.sendStatus(204);
+  res.clearCookie(COOKIE_NAME, {
     httpOnly: "true",
     secure: isProd,
     sameSite: isProd ? "none" : "lax",
@@ -427,7 +431,7 @@ router.get("/logout", (req, res) => {
   res.json({ message: "Cookie cleared" });
 });
 
-router.post("/google", async (req, res, next) => {
+router.post("/google", csrf, async (req, res, next) => {
   const body = req.body;
   try {
     //find if the user exists
@@ -618,6 +622,7 @@ router.get("/profile", isAuthenticated, async (req, res) => {
 
 router.put(
   "/update/profile",
+  csrf,
   isAuthenticated,
   updateLimiter,
   async (req, res) => {
@@ -748,6 +753,7 @@ router.put(
 
 router.put(
   "/profile-picture/update",
+  csrf,
   isAuthenticated,
   uploadLimiter,
   upload.single("profileImage"),
@@ -961,7 +967,7 @@ router.put(
   }
 );
 
-router.delete("/delete", isAuthenticated, async (req, res) => {
+router.delete("/delete", csrf, isAuthenticated, async (req, res) => {
   const userId = req.user;
 
   try {
