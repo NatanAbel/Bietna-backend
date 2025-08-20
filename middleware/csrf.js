@@ -4,15 +4,15 @@ const isProd = process.env.NODE_ENV === 'production';
 exports.ensureCsrfCookie = (req, res, next) => {
   if (!req.cookies['XSRF-TOKEN']) {
     const token = crypto.randomBytes(32).toString('hex');
-    res.cookie('XSRF-TOKEN', token, {
+    const cookieOptions = {
       httpOnly: false,
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
       path: '/',
       // Allow both frontend.onrender.com and backend-api.onrender.com to read it
       ...(isProd ? { domain: '.onrender.com' } : {}),
-    });
-    res.cookie('XSRF-TOKEN', token, opts);
+    };
+    res.cookie('XSRF-TOKEN', token, cookieOptions);
   }
   next();
 };
